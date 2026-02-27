@@ -1,11 +1,18 @@
-name: my_book_shelves
-version: 1.0.0
-
 dependencies:
-  flutter:
-    sdk: flutter
-  cupertino_icons: ^1.0.2
+  flutter: 
+  cupertino_icons: 
+  provider: 
+  drift:
+  drift_flutter:
+  archive:
+  file_picker:
+  share_plus:
+  path_provider:
+  shared_preferences:
+  uuid:
 
 dev_dependencies:
   flutter_test:
-    sdk: flutter
+  drift_dev:
+  build_runner:
+  flutter_lints:
