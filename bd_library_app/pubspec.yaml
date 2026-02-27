@@ -1,32 +1,9 @@
-<<<<<<< HEAD
-dependencies:
-  flutter: 
-  cupertino_icons: 
-  provider: 
-  drift:
-  drift_flutter:
-  archive:
-  file_picker:
-  share_plus:
-  path_provider:
-  shared_preferences:
-  uuid:
-
-dev_dependencies:
-  flutter_test:
-  drift_dev:
-  build_runner:
-  flutter_lints:
-=======
 name: bd_library_app
 description: "A new Flutter project."
 publish_to: 'none'
-
 version: 1.0.0+1
-
 environment:
   sdk: ^3.10.7
-
 dependencies:
   flutter:
     sdk: flutter
@@ -40,14 +17,11 @@ dependencies:
   path_provider: ^2.1.4
   shared_preferences: ^2.2.3
   uuid: ^4.5.1
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
   drift_dev: ^2.22.1
   build_runner: ^2.4.13
   flutter_lints: ^6.0.0
-
 flutter:
   uses-material-design: true
->>>>>>> 968af3d (correct dependencies structure)
