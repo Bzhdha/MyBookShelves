@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import 'db/app_db.dart';
 import 'state/active_user_store.dart';
 import 'ui/book_detail_page.dart';
+import 'ui/add_book_page.dart';
 import 'ui/users_page.dart';
+import 'ui/isbn_scanner_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,8 +58,26 @@ class HomePage extends StatelessWidget {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const IsbnScannerPage()),
+          );
+        },
+        child: const Icon(Icons.qr_code_scanner),
+      ),
+//      floatingActionButtonManual: FloatingActionButton(
+//        onPressed: () {
+//          Navigator.push(
+//            context,
+//            MaterialPageRoute(builder: (_) => const AddBookPage()),
+//          );
+//        },
+//        child: const Icon(Icons.add),
+//      ),
       body: FutureBuilder(
-        future: db.getAllBooks(),
+          future: db.getAllBooks(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());

@@ -1,9 +1,11 @@
 import 'dart:io';
 
 import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'family_tables.dart';
 
 part 'app_db.g.dart';
 
@@ -11,6 +13,7 @@ part 'app_db.g.dart';
 /// Tables
 /// --------------------
 
+@DataClassName('SeriesData')
 class Series extends Table {
   TextColumn get id => text()(); // UUID
   TextColumn get name => text()();
@@ -80,7 +83,7 @@ class Copies extends Table {
 /// --------------------
 /// DB
 /// --------------------
-@DriftDatabase(tables: [Books, Series, Copies])
+@DriftDatabase(tables: [Books, Series, Copies, Users, UserCopyMetas])
 class AppDb extends _$AppDb {
   AppDb() : super(_openConnection());
 

@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../db/app_db.dart';
 import '../state/active_user_store.dart';
+import 'package:drift/drift.dart' hide Column;
 
 class UsersPage extends StatefulWidget {
   const UsersPage({super.key});
@@ -90,7 +91,7 @@ class _UsersPageState extends State<UsersPage> {
               await db.into(db.users).insertOnConflictUpdate(UsersCompanion.insert(
                     id: id,
                     displayName: nameCtrl.text.trim().isEmpty ? 'Membre' : nameCtrl.text.trim(),
-                    avatar: avatarCtrl.text.trim(),
+                    avatar: Value(avatarCtrl.text.trim()),
                     updatedAt: DateTime.now(),
                   ));
               if (context.mounted) Navigator.pop(context);

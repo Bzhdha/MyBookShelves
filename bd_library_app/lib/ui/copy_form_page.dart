@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:drift/drift.dart';
 
 import '../db/app_db.dart';
 
@@ -100,11 +101,11 @@ class _CopyFormPageState extends State<CopyFormPage> {
                 await db.upsertCopy(CopiesCompanion.insert(
                   id: id,
                   bookId: widget.bookId,
-                  rating: rating,
-                  review: review,
-                  condition: condition,
+                  rating: Value(rating),
+                  review: Value(review),
+                  condition: Value(condition),
                   location: Value(location),
-                  notes: notes,
+                  notes: Value(notes),
                   updatedAt: DateTime.now(),
                 ));
                 if (context.mounted) Navigator.pop(context);
