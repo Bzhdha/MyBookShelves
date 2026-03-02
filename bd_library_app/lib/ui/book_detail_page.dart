@@ -41,7 +41,44 @@ class _BookDetailPageState extends State<BookDetailPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(book!.title)),
+      appBar: AppBar(
+        title: Text(book!.title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete),
+            tooltip: 'Supprimer le livre',
+            onPressed: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text('Supprimer ce livre ?'),
+                  content: const Text(
+                    'Cela supprimera aussi tous les exemplaires associés.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Annuler'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Supprimer'),
+                    ),
+                  ],
+                ),
+              );
+
+              if (ok != true || !context.mounted) return;
+
+              final db = context.read<AppDb>();
+              await db.deleteBookById(book!.id);
+
+              if (!context.mounted) return;
+              Navigator.pop(context); // retour à la liste
+            },
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
         label: const Text('Ajouter un exemplaire'),

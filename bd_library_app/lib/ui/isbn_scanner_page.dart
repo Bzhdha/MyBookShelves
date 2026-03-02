@@ -70,6 +70,14 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
       // 1) On tente de récupérer les métadonnées via sites ouverts (OpenLibrary)
       final meta = await _metadataService.enrichFromIsbn(isbn);
 
+      if (meta == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors de la récupération des métadonnées')),
+        );
+        return;
+      }
+
       // 2) Création de l’œuvre
       bookId = const Uuid().v4();
 

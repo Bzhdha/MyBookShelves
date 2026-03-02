@@ -202,6 +202,12 @@ class AppDb extends _$AppDb {
     }
     return result;
   }
+
+
+  // refresh the list of books
+  Stream<List<Book>> watchAllBooks() =>
+    (select(books)..orderBy([(t) => OrderingTerm.asc(t.title)])).watch();
+
 }
 
 LazyDatabase _openConnection() {

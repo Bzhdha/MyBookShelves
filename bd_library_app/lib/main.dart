@@ -76,35 +76,25 @@ class HomePage extends StatelessWidget {
 //        },
 //        child: const Icon(Icons.add),
 //      ),
-      body: FutureBuilder(
-          future: db.getAllBooks(),
+      body: StreamBuilder<List<Book>>(
+        stream: db.watchAllBooks(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-
           final books = snapshot.data!;
           if (books.isEmpty) {
             return const Center(child: Text("Aucune BD enregistrée"));
           }
-
           return ListView(
-            children: books
-                .map(
-                  (b) => ListTile(
-                    title: Text(b.title),
-                    subtitle: Text(b.authors),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => BookDetailPage(bookId: b.id),
-                        ),
-                      );
-                    },
-                  ),
-                )
-                .toList(),
+            children: books.map((b) => ListTile(
+              title: Text(b.title),
+              subtitle: Text(b.authors),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => BookDetailPage(bookId: b.id)),
+              ),
+            )).toList(),
           );
         },
       ),
