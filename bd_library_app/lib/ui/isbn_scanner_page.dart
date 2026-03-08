@@ -75,7 +75,7 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erreur lors de la récupération des métadonnées')),
         );
-        return;
+        //return;
       }
 
       // 2) Création de l’œuvre
