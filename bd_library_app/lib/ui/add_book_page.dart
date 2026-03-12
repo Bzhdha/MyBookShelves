@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart' hide Column;
 
-import '../db/app_db.dart';
+import '../features/books/domain/book_service.dart';
 import '../services/metadata_service.dart';
 import '../services/open_library_provider.dart';
 
@@ -77,7 +76,7 @@ class _AddBookPageState extends State<AddBookPage> {
 
   @override
   Widget build(BuildContext context) {
-    final db = context.read<AppDb>();
+    final bookService = context.read<BookService>();
 
     return Scaffold(
       appBar: AppBar(title: const Text("Ajouter un livre")),
@@ -125,19 +124,15 @@ class _AddBookPageState extends State<AddBookPage> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () async {
-                final id = const Uuid().v4();
-
-                await db.upsertBook(
-                  BooksCompanion.insert(
-                    id: id,
-                    isbn: Value(_isbnCtrl.text.trim().isEmpty ? null : _isbnCtrl.text.trim()),
-                    title: _titleCtrl.text,
-                    authors: Value(_authorsCtrl.text),
-                    publisher: Value(_publisherCtrl.text.trim().isEmpty ? null : _publisherCtrl.text.trim()),
-                    publishedDate: Value(_publishedDateCtrl.text.trim().isEmpty ? null : _publishedDateCtrl.text.trim()),
-                    coverUrl: Value(_lastCoverUrl),
-                    updatedAt: DateTime.now(),
-                  ),
+                await bookService.addBookManually(
+                  isbn: _isbnCtrl.text.trim().isEmpty
+                      ? null
+                      : _isbnCtrl.text.trim(),
+                  title: _titleCtrl.text,
+                  authors: _authorsCtrl.text,
+                  publisher: _publisherCtrl.text,
+                  publishedDate: _publishedDateCtrl.text,
+                  coverUrl: _lastCoverUrl,
                 );
 
                 if (mounted) Navigator.pop(context);

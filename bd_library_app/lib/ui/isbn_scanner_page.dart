@@ -1,13 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
-import 'package:drift/drift.dart' hide Column;
-import '../services/metadata_service.dart';
-import '../services/open_library_provider.dart';
-import '../services/cover_cache_service.dart';
 
-import '../db/app_db.dart';
+import '../features/books/domain/book_service.dart';
 
 class IsbnScannerPage extends StatefulWidget {
   const IsbnScannerPage({super.key});
@@ -22,11 +17,6 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
     facing: CameraFacing.back,
     torchEnabled: false,
   );
-
-  final MetadataService _metadataService =
-      MetadataService(openLibrary: OpenLibraryProvider());
-
-  final CoverCacheService _coverCacheService = CoverCacheService();
 
   String? _pendingIsbn; // ISBN en attente de validation
   String? _lastAcceptedIsbn; // anti doublon “validation”
@@ -62,120 +52,8 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
     return DateTime.now().difference(_lastAcceptedAt!) < const Duration(seconds: 2);
   }
 
-  Future<void> _onValidate(AppDb db, String isbn) async {
-    final works = await db.findWorksByIsbn(isbn);
-
-    String bookId;
-    if (works.isEmpty) {
-      // 1) On tente de récupérer les métadonnées via sites ouverts (OpenLibrary)
-      final meta = await _metadataService.enrichFromIsbn(isbn);
-
-      if (meta == null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de la récupération des métadonnées')),
-        );
-        //return;
-      }
-
-      // 2) Création de l’œuvre
-      bookId = const Uuid().v4();
-
-      final title = (meta?.title?.trim().isNotEmpty ?? false)
-          ? meta!.title!.trim()
-          : 'ISBN $isbn';
-
-      final authorsCsv = (meta?.authors != null && meta!.authors!.isNotEmpty)
-          ? meta.authors!.join(', ')
-          : '';
-
-      final coverUrl = meta?.coverUrl;
-
-      // 3) (optionnel mais top) télécharger la cover en local
-      final coverLocalPath = await _coverCacheService.downloadCoverToLocalPath(
-        bookId: bookId,
-        coverUrl: coverUrl,
-      );
-
-      await db.upsertBook(
-        BooksCompanion.insert(
-          id: bookId,
-          isbn: Value(isbn),
-          title: title,
-          authors: Value(authorsCsv),
-          publisher: Value(meta?.publisher),
-          publishedDate: Value(meta?.publishedDate),
-          coverUrl: Value(coverUrl),
-          coverLocalPath: Value(coverLocalPath),
-          updatedAt: DateTime.now(),
-        ),
-      );
-    } else {
-      // Œuvre déjà existante : on réutilise
-      final existing = works.first;
-      bookId = existing.id;
-
-      // (Optionnel) enrichir si c’est encore un placeholder "ISBN ..."
-      final isPlaceholderTitle = existing.title.trim() == 'ISBN $isbn';
-
-      final missingCoreInfo =
-          isPlaceholderTitle ||
-          (existing.publisher == null || existing.publisher!.trim().isEmpty) ||
-          (existing.publishedDate == null || existing.publishedDate!.trim().isEmpty) ||
-          (existing.coverUrl == null || existing.coverUrl!.trim().isEmpty);
-
-      if (missingCoreInfo) {
-        final meta = await _metadataService.enrichFromIsbn(isbn);
-        if (meta != null) {
-          final newTitle = isPlaceholderTitle && (meta.title?.trim().isNotEmpty ?? false)
-              ? meta.title!.trim()
-              : existing.title;
-
-          final newAuthors = (existing.authors.trim().isEmpty &&
-                  meta.authors != null &&
-                  meta.authors!.isNotEmpty)
-              ? meta.authors!.join(', ')
-              : existing.authors;
-
-          final newCoverUrl = (existing.coverUrl == null || existing.coverUrl!.trim().isEmpty)
-              ? meta.coverUrl
-              : existing.coverUrl;
-
-          String? newCoverLocalPath = existing.coverLocalPath;
-          if ((newCoverLocalPath == null || newCoverLocalPath.trim().isEmpty) &&
-              (newCoverUrl != null && newCoverUrl.trim().isNotEmpty)) {
-            newCoverLocalPath = await _coverCacheService.downloadCoverToLocalPath(
-              bookId: bookId,
-              coverUrl: newCoverUrl,
-            );
-          }
-
-          await db.upsertBook(
-            BooksCompanion(
-              id: Value(bookId),
-              isbn: Value(isbn),
-              title: Value(newTitle),
-              authors: Value(newAuthors),
-              publisher: Value(existing.publisher?.trim().isNotEmpty == true ? existing.publisher : meta.publisher),
-              publishedDate: Value(existing.publishedDate?.trim().isNotEmpty == true ? existing.publishedDate : meta.publishedDate),
-              coverUrl: Value(newCoverUrl),
-              coverLocalPath: Value(newCoverLocalPath),
-              updatedAt: Value(DateTime.now()),
-            ),
-          );
-        }
-      }
-    }
-
-    // 4) On crée un exemplaire (doublons gérés ici)
-    final copyId = const Uuid().v4();
-    await db.upsertCopy(
-      CopiesCompanion.insert(
-        id: copyId,
-        bookId: bookId,
-        updatedAt: DateTime.now(),
-      ),
-    );
+  Future<void> _onValidate(BookService bookService, String isbn) async {
+    await bookService.addOrUpdateFromIsbnScan(isbn);
 
     _lastAcceptedIsbn = isbn;
     _lastAcceptedAt = DateTime.now();
@@ -204,7 +82,7 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final db = context.read<AppDb>();
+    final bookService = context.read<BookService>();
 
     return Scaffold(
       appBar: AppBar(
@@ -310,7 +188,8 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
                         ),
                         const SizedBox(width: 4),
                         FilledButton.icon(
-                          onPressed: () => _onValidate(db, _pendingIsbn!),
+                          onPressed: () =>
+                              _onValidate(bookService, _pendingIsbn!),
                           icon: const Icon(Icons.check),
                           label: const Text('Valider'),
                         ),

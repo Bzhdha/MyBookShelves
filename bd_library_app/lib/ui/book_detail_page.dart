@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 
 import '../db/app_db.dart';
+import '../features/books/domain/book_service.dart';
 import 'copy_form_page.dart';
 
 class BookDetailPage extends StatefulWidget {
@@ -24,9 +24,9 @@ class _BookDetailPageState extends State<BookDetailPage> {
   }
 
   Future<void> _load() async {
-    final db = context.read<AppDb>();
-    final b = await db.getBookById(widget.bookId);
-    final c = await db.getCopiesByBook(widget.bookId);
+    final service = context.read<BookService>();
+    final b = await service.getBook(widget.bookId);
+    final c = await service.getCopies(widget.bookId);
 
     setState(() {
       book = b;
@@ -70,8 +70,8 @@ class _BookDetailPageState extends State<BookDetailPage> {
 
               if (ok != true || !context.mounted) return;
 
-              final db = context.read<AppDb>();
-              await db.deleteBookById(book!.id);
+              final service = context.read<BookService>();
+              await service.deleteBook(book!.id);
 
               if (!context.mounted) return;
               Navigator.pop(context); // retour à la liste

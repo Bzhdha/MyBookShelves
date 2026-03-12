@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide Column;
 
-import '../db/app_db.dart';
+import '../features/books/domain/book_service.dart';
 
 class CopyFormPage extends StatefulWidget {
   final String bookId;
@@ -30,8 +30,8 @@ class _CopyFormPageState extends State<CopyFormPage> {
 
   Future<void> _load() async {
     if (widget.copyId == null) return;
-    final db = context.read<AppDb>();
-    final copies = await db.getCopiesByBook(widget.bookId);
+    final bookService = context.read<BookService>();
+    final copies = await bookService.getCopies(widget.bookId);
     final c = copies.firstWhere((e) => e.id == widget.copyId);
 
     setState(() {
@@ -45,7 +45,7 @@ class _CopyFormPageState extends State<CopyFormPage> {
 
   @override
   Widget build(BuildContext context) {
-    final db = context.read<AppDb>();
+    final bookService = context.read<BookService>();
 
     return Scaffold(
       appBar: AppBar(
@@ -98,7 +98,7 @@ class _CopyFormPageState extends State<CopyFormPage> {
             FilledButton(
               onPressed: () async {
                 final id = widget.copyId ?? const Uuid().v4();
-                await db.upsertCopy(CopiesCompanion.insert(
+                await bookService.upsertCopy(CopiesCompanion.insert(
                   id: id,
                   bookId: widget.bookId,
                   rating: Value(rating),

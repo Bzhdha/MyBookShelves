@@ -7,15 +7,27 @@ import 'ui/book_detail_page.dart';
 import 'ui/add_book_page.dart';
 import 'ui/users_page.dart';
 import 'ui/isbn_scanner_page.dart';
+import 'features/books/data/books_repository.dart';
+import 'features/books/domain/book_service.dart';
+import 'services/metadata_service.dart';
+import 'services/open_library_provider.dart';
+import 'services/cover_cache_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   final db = AppDb();
+  final booksRepository = BooksRepository(db);
+  final bookService = BookService(
+    booksRepository,
+    MetadataService(openLibrary: OpenLibraryProvider()),
+    CoverCacheService(),
+  );
 
   runApp(
     MultiProvider(
       providers: [
         Provider<AppDb>.value(value: db),
+        Provider<BookService>.value(value: bookService),
         ChangeNotifierProvider(create: (_) => ActiveUserStore()..load()),
       ],
       child: const MyApp(),
@@ -41,7 +53,7 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final db = context.read<AppDb>();
+    final bookService = context.read<BookService>();
 
     return Scaffold(
       appBar: AppBar(
@@ -77,7 +89,7 @@ class HomePage extends StatelessWidget {
 //        child: const Icon(Icons.add),
 //      ),
       body: StreamBuilder<List<Book>>(
-        stream: db.watchAllBooks(),
+        stream: bookService.watchAllBooks(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
