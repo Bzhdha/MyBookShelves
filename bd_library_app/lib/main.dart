@@ -125,10 +125,21 @@ class HomePage extends StatelessWidget {
           ),
           IconButton(
             icon: const Icon(Icons.group),
+            tooltip: 'Membres de la famille',
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const UsersPage()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'Ajouter un livre à la main',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AddBookPage()),
               );
             },
           ),
@@ -143,15 +154,6 @@ class HomePage extends StatelessWidget {
         },
         child: const Icon(Icons.qr_code_scanner),
       ),
-//      floatingActionButtonManual: FloatingActionButton(
-//        onPressed: () {
-//          Navigator.push(
-//            context,
-//            MaterialPageRoute(builder: (_) => const AddBookPage()),
-//          );
-//        },
-//        child: const Icon(Icons.add),
-//      ),
       body: StreamBuilder<List<(Book, String?)>>(
         stream: bookService.watchAllBooksWithSeriesNames(),
         builder: (context, snapshot) {
