@@ -39,6 +39,13 @@ class BdThequeProvider {
       final nom = (first['nom'] as String?)?.trim();
       final nomserie = (first['nomserie'] as String?)?.trim();
       final rawId = (first['id'] as String?)?.trim();
+      final couv = (first['couv'] as String?)?.trim();
+
+      // URL couverture : base BdTheque pour les fichiers retournés par l'API (ex. "81890-couverture-bd-....jpg")
+      String? coverUrlFromApi;
+      if (couv != null && couv.isNotEmpty) {
+        coverUrlFromApi = 'https://www.bdtheque.com/upload/$couv';
+      }
 
       // Numéro de tome extrait de "Tome 1", "Tome 2", etc.
       String? volumeNumber;
@@ -60,14 +67,16 @@ class BdThequeProvider {
       String? title = titleFromApi;
       List<String>? authors;
       String? publisher;
+      String? coverUrl = coverUrlFromApi;
 
-      // Dès qu'on a un id (ex: "26021/knight-club"), on charge la page série pour titre + auteurs + éditeur
+      // Dès qu'on a un id (ex: "26021/knight-club"), on charge la page série pour titre + auteurs + éditeur + couverture
       if (rawId != null && rawId.isNotEmpty) {
         final seriesMeta = await _fetchSeriesPage(rawId);
         if (seriesMeta != null) {
           title = title ?? seriesMeta.title;
           authors = seriesMeta.authors;
           publisher = seriesMeta.publisher;
+          coverUrl = seriesMeta.coverUrl ?? coverUrl;
         }
       }
 
@@ -77,7 +86,7 @@ class BdThequeProvider {
         title: title,
         authors: authors,
         publisher: publisher,
-        coverUrl: null,
+        coverUrl: coverUrl,
         volumeNumber: volumeNumber,
       );
     } catch (_) {
@@ -85,9 +94,9 @@ class BdThequeProvider {
     }
   }
 
-  /// Charge la page série BdTheque pour extraire titre, auteurs, éditeur.
+  /// Charge la page série BdTheque pour extraire titre, auteurs, éditeur, couverture.
   /// URL utilisée : https://www.bdtheque.com/series/{id} (ex. .../series/26021/knight-club)
-  Future<({String? title, List<String>? authors, String? publisher})?> _fetchSeriesPage(String seriesId) async {
+  Future<({String? title, List<String>? authors, String? publisher, String? coverUrl})?> _fetchSeriesPage(String seriesId) async {
     try {
       final path = seriesId.replaceAll(r'\', '/');
       final uri = Uri.parse('https://www.bdtheque.com/series/$path');
@@ -127,7 +136,29 @@ class BdThequeProvider {
         }
       }
 
-      return (title: title, authors: authors.isEmpty ? null : authors, publisher: publisher);
+      // Couverture : image dont l'URL contient "upload" ou "couv" (couverture), sinon première img avec src valide
+      String? coverUrl;
+      final imgs = doc.querySelectorAll('img[src]');
+      for (final img in imgs) {
+        final src = img.attributes['src']?.trim();
+        if (src == null || src.isEmpty) continue;
+        final lower = src.toLowerCase();
+        if (lower.contains('upload') || lower.contains('couv')) {
+          coverUrl = src.startsWith('http') ? src : 'https://www.bdtheque.com${src.startsWith('/') ? '' : '/'}$src';
+          break;
+        }
+      }
+      if (coverUrl == null) {
+        for (final img in imgs) {
+          final src = img.attributes['src']?.trim();
+          if (src != null && src.isNotEmpty) {
+            coverUrl = src.startsWith('http') ? src : 'https://www.bdtheque.com${src.startsWith('/') ? '' : '/'}$src';
+            break;
+          }
+        }
+      }
+
+      return (title: title, authors: authors.isEmpty ? null : authors, publisher: publisher, coverUrl: coverUrl);
     } catch (_) {
       return null;
     }
