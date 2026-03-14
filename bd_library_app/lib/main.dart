@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -184,7 +186,24 @@ class HomePage extends StatelessWidget {
                   : (b.isbn != null && b.isbn!.trim().isNotEmpty && hasTitle
                       ? 'ISBN ${b.isbn}'
                       : null);
+              final coverPath = b.coverLocalPath;
+              final hasCoverPath = coverPath != null && coverPath.trim().isNotEmpty;
               return ListTile(
+                leading: SizedBox(
+                  width: 40,
+                  height: 56,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: hasCoverPath
+                        ? Image.file(
+                            File(coverPath),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                HomePage._coverPlaceholder(),
+                          )
+                        : HomePage._coverPlaceholder(),
+                  ),
+                ),
                 title: Text(titleDisplay),
                 subtitle: subtitleDisplay != null ? Text(subtitleDisplay) : null,
                 onTap: () => Navigator.push(
@@ -196,6 +215,13 @@ class HomePage extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+
+  static Widget _coverPlaceholder() {
+    return Container(
+      color: Colors.grey.shade300,
+      child: const Icon(Icons.menu_book, size: 28),
     );
   }
 }

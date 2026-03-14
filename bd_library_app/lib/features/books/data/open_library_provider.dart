@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html_parser;
 import '../../../models/bd_metadata.dart';
@@ -80,12 +79,21 @@ class OpenLibraryProvider {
 
       final coverUrl = doc.querySelector('.artwork object')?.attributes['data'];
 
+      // Extraction du numéro de tome depuis le titre (ex: "Knight Club, Tome 1" ou "Volume 2")
+      String? volumeNumber;
+      if (fullTitle != null && fullTitle.isNotEmpty) {
+        final tomeMatch = RegExp(r'Tome\s*(\d+)', caseSensitive: false).firstMatch(fullTitle);
+        final volMatch = tomeMatch ?? RegExp(r'Volume\s*(\d+)', caseSensitive: false).firstMatch(fullTitle);
+        if (volMatch != null) volumeNumber = volMatch.group(1);
+      }
+
       return BdMetadata(
         title: fullTitle,
         authors: authors,
         publisher: publisher,
         publishedDate: publishDate,
-        // coverUrl: (optionnel) tu peux aussi le récupérer si tu veux, voir plus bas
+        coverUrl: coverUrl,
+        volumeNumber: volumeNumber,
       );
     } catch (e) {
       print('Error fetching metadata: $e');
