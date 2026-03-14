@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-import '../models/bd_metadata.dart';
+import '../../../models/bd_metadata.dart';
 
 class BdThequeProvider {
   Future<BdMetadata?> fetchByIsbn(String isbn13) async {
@@ -53,7 +53,7 @@ class BdThequeProvider {
       // ].join(' - ').trim();
 
       // L'API retourne seulement le nom du fichier image.
-      // Tant que tu n’as pas confirmé l’URL absolue attendue par le site,
+      // Tant que tu n'as pas confirmé l'URL absolue attendue par le site,
       // mieux vaut ne pas renseigner coverUrl ici.
       // final coverUrl = couv != null && couv.isNotEmpty
       //     ? 'URL_ABSOLUE_A_CONFIRMER/$couv'

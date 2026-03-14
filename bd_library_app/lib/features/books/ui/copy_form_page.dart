@@ -3,8 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart' hide Column;
 
-import '../db/app_db.dart';
-import '../features/books/domain/book_service.dart';
+import '../../../db/app_db.dart';
+import '../domain/book_service.dart';
 
 class CopyFormPage extends StatefulWidget {
   final String bookId;

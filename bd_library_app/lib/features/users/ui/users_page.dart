@@ -1,10 +1,10 @@
+import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
-import '../db/app_db.dart';
-import '../state/active_user_store.dart';
-import 'package:drift/drift.dart' hide Column;
+import '../../../db/app_db.dart';
+import '../domain/active_user_store.dart';
 
 class UsersPage extends StatefulWidget {
   const UsersPage({super.key});
