@@ -13,6 +13,7 @@ import 'services/metadata_service.dart';
 import 'services/open_library_provider.dart';
 import 'services/cover_cache_service.dart';
 import 'services/bdtheque_provider.dart';
+import 'services/library_transfer_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,6 +64,28 @@ class HomePage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Bibliothèque BD'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.download),
+            tooltip: 'Exporter en JSON',
+            onPressed: () async {
+              final db = context.read<AppDb>();
+              final transfer = LibraryTransferService(db);
+              try {
+                await transfer.shareExportJson();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Export JSON partagé')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Erreur export: $e')),
+                  );
+                }
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.group),
             onPressed: () {

@@ -153,6 +153,73 @@ class LibraryTransferService {
   }
 
   /// ----------------------------
+  /// EXPORT JSON (contenu BDD seul, sans couvertures)
+  /// ----------------------------
+  Future<File> exportToJsonFile() async {
+    final allSeries = await db.getAllSeries();
+    final allBooks = await db.getAllBooks();
+
+    final allCopies = <Copy>[];
+    for (final b in allBooks) {
+      final cs = await db.getCopiesByBook(b.id);
+      allCopies.addAll(cs);
+    }
+
+    final payload = ExportLibrary(
+      version: 2,
+      exportedAt: DateTime.now(),
+      series: allSeries
+          .map((s) => ExportSeries(
+                id: s.id,
+                name: s.name,
+                expectedVolumes: s.expectedVolumes,
+                tags: s.tags,
+                updatedAt: s.updatedAt,
+              ))
+          .toList(),
+      books: allBooks
+          .map((b) => ExportBook(
+                id: b.id,
+                isbn: b.isbn,
+                title: b.title,
+                seriesId: b.seriesId,
+                volumeNumber: b.volumeNumber,
+                authors: b.authors,
+                publisher: b.publisher,
+                publishedDate: b.publishedDate,
+                coverUrl: b.coverUrl,
+                tags: b.tags,
+                updatedAt: b.updatedAt,
+              ))
+          .toList(),
+      copies: allCopies
+          .map((c) => ExportCopy(
+                id: c.id,
+                bookId: c.bookId,
+                rating: c.rating,
+                review: c.review,
+                condition: c.condition,
+                location: c.location,
+                notes: c.notes,
+                updatedAt: c.updatedAt,
+              ))
+          .toList(),
+    );
+
+    final tmp = await getTemporaryDirectory();
+    final jsonPath = p.join(tmp.path, 'bd_library_export.json');
+    final jsonBytes = utf8.encode(const JsonEncoder.withIndent('  ').convert(payload.toJson()));
+    final file = File(jsonPath);
+    await file.writeAsBytes(jsonBytes);
+    return file;
+  }
+
+  Future<void> shareExportJson() async {
+    final file = await exportToJsonFile();
+    await Share.shareXFiles([XFile(file.path)], text: 'Export bibliothèque BD (JSON)');
+  }
+
+  /// ----------------------------
   /// PICK ZIP
   /// ----------------------------
   Future<File?> pickZipFile() async {
