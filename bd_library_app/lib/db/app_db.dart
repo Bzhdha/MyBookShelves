@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
-import 'package:drift_flutter/drift_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'family_tables.dart';
@@ -56,6 +55,28 @@ class Books extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Étagères thématiques pour classer les livres (nom + couleur).
+@DataClassName('Shelf')
+class Shelves extends Table {
+  TextColumn get id => text()(); // UUID
+  TextColumn get name => text()();
+  TextColumn get color => text().withDefault(const Constant('#6200EE'))(); // hex
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Association livre ↔ étagère (N-N).
+class BookShelf extends Table {
+  TextColumn get bookId => text().references(Books, #id)();
+  TextColumn get shelfId => text().references(Shelves, #id)();
+
+  @override
+  Set<Column> get primaryKey => {bookId, shelfId};
+}
+
 /// Représente un exemplaire (doublons gérés ici).
 /// Note + avis au niveau exemplaire.
 class Copies extends Table {
@@ -83,20 +104,15 @@ class Copies extends Table {
 /// --------------------
 /// DB
 /// --------------------
-@DriftDatabase(tables: [Books, Series, Copies, Users, UserCopyMetas])
+@DriftDatabase(tables: [Books, Series, Copies, Shelves, BookShelf, Users, UserCopyMetas])
 class AppDb extends _$AppDb {
   AppDb() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
-  /// Migration strategy (v1 -> v2)
-  /// - crée Copies
-  /// - ajoute tags sur Series/Books si besoin
-  ///
-  /// NOTE: si tu avais rating/review en v1 dans Books,
-  /// on ne peut pas les migrer automatiquement sans conserver l'ancien schéma.
-  /// En pratique: fais une migration manuelle si tu as déjà des données.
+  /// Migration strategy (v1 -> v2 -> v3)
+  /// v2: Copies. v3: Shelves + BookShelf (étagères thématiques).
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
@@ -105,8 +121,10 @@ class AppDb extends _$AppDb {
         onUpgrade: (m, from, to) async {
           if (from < 2) {
             await m.createTable(copies);
-            // Si tu ajoutes tags après coup, Drift gérera via addColumn.
-            // Ici, on suppose que v2 crée tags dès le départ.
+          }
+          if (from < 3) {
+            await m.createTable(shelves);
+            await m.createTable(bookShelf);
           }
         },
       );
@@ -155,6 +173,16 @@ class AppDb extends _$AppDb {
             ..orderBy([(t) => OrderingTerm.asc(t.volumeNumber)]))
           .get();
 
+  /// Met à jour uniquement le chemin de la couverture (après prise au scan).
+  Future<void> updateBookCoverLocalPath(String bookId, String? coverLocalPath) async {
+    await (update(books)..where((t) => t.id.equals(bookId))).write(
+      BooksCompanion(
+        coverLocalPath: coverLocalPath != null ? Value(coverLocalPath) : const Value.absent(),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   /// --------------------
   /// Copies (exemplaires)
   /// --------------------
@@ -177,6 +205,56 @@ class AppDb extends _$AppDb {
 
   Future<void> deleteCopyById(String id) async {
     await (delete(copies)..where((c) => c.id.equals(id))).go();
+  }
+
+  /// --------------------
+  /// Shelves (étagères thématiques)
+  /// --------------------
+  Future<List<Shelf>> getAllShelves() =>
+      (select(shelves)..orderBy([(t) => OrderingTerm.asc(t.sortOrder), (t) => OrderingTerm.asc(t.name)])).get();
+
+  Future<Shelf?> getShelfById(String id) =>
+      (select(shelves)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  Future<void> upsertShelf(ShelvesCompanion s) =>
+      into(shelves).insertOnConflictUpdate(s);
+
+  Future<void> deleteShelfById(String id) async {
+    await (delete(bookShelf)..where((t) => t.shelfId.equals(id))).go();
+    await (delete(shelves)..where((t) => t.id.equals(id))).go();
+  }
+
+  Stream<List<Shelf>> watchAllShelves() =>
+      (select(shelves)..orderBy([(t) => OrderingTerm.asc(t.sortOrder), (t) => OrderingTerm.asc(t.name)])).watch();
+
+  /// --------------------
+  /// BookShelf (livre ↔ étagère)
+  /// --------------------
+  Future<List<String>> getShelfIdsByBook(String bookId) async {
+    final rows = await (select(bookShelf)..where((t) => t.bookId.equals(bookId))).get();
+    return rows.map((r) => r.shelfId).toList();
+  }
+
+  Future<void> setBookShelves(String bookId, List<String> shelfIds) async {
+    await (delete(bookShelf)..where((t) => t.bookId.equals(bookId))).go();
+    for (final shelfId in shelfIds) {
+      await into(bookShelf).insert(BookShelfCompanion.insert(bookId: bookId, shelfId: shelfId));
+    }
+  }
+
+  Future<List<Book>> getBooksByShelf(String shelfId) async {
+    final ids = await (select(bookShelf)..where((t) => t.shelfId.equals(shelfId))).get();
+    if (ids.isEmpty) return [];
+    final bookIds = ids.map((r) => r.bookId).toList();
+    return (select(books)..where((t) => t.id.isIn(bookIds))..orderBy([(t) => OrderingTerm.asc(t.title)])).get();
+  }
+
+  Stream<List<Book>> watchBooksByShelf(String shelfId) {
+    return (select(bookShelf)..where((t) => t.shelfId.equals(shelfId)))
+        .watch()
+        .asyncExpand((_) async* {
+      yield await getBooksByShelf(shelfId);
+    });
   }
 
   /// --------------------

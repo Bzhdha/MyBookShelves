@@ -3,6 +3,9 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
 import '../domain/book_service.dart';
+import '../../settings/data/scan_settings_store.dart';
+import '../../settings/ui/scan_settings_page.dart';
+import 'cover_photo_page.dart';
 
 class IsbnScannerPage extends StatefulWidget {
   const IsbnScannerPage({super.key});
@@ -53,7 +56,7 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
   }
 
   Future<void> _onValidate(BookService bookService, String isbn) async {
-    await bookService.addOrUpdateFromIsbnScan(isbn);
+    final bookId = await bookService.addOrUpdateFromIsbnScan(isbn);
 
     _lastAcceptedIsbn = isbn;
     _lastAcceptedAt = DateTime.now();
@@ -63,6 +66,20 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
       SnackBar(content: Text('Ajouté : $isbn')),
     );
 
+    final scanSettings = context.read<ScanSettingsStore>();
+    if (scanSettings.photoCoverEnabled && mounted) {
+      final result = await Navigator.push<CoverPhotoResult>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CoverPhotoPage(bookId: bookId),
+        ),
+      );
+      if (result != null && result.coverPath != null && mounted) {
+        await bookService.updateBookCoverFromScan(bookId, result.coverPath!);
+      }
+    }
+
+    if (!mounted) return;
     setState(() => _pendingIsbn = null);
     await _controller.start();
   }
@@ -88,19 +105,29 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
       appBar: AppBar(
         title: const Text('Scan ISBN (enchaîné)'),
         actions: [
-            IconButton(
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ScanSettingsPage()),
+              );
+            },
+            tooltip: 'Paramètres scan (photo couverture/dos)',
+          ),
+          IconButton(
             icon: ValueListenableBuilder<MobileScannerState>(
-                valueListenable: _controller,
-                builder: (_, state, __) {
+              valueListenable: _controller,
+              builder: (_, state, __) {
                 final isOn = state.torchState == TorchState.on;
                 return Icon(
-                    isOn ? Icons.flash_on : Icons.flash_off,
+                  isOn ? Icons.flash_on : Icons.flash_off,
                 );
-                },
+              },
             ),
             onPressed: () => _controller.toggleTorch(),
             tooltip: 'Flash',
-            ),
+          ),
           IconButton(
             icon: const Icon(Icons.close),
             onPressed: () => Navigator.pop(context),

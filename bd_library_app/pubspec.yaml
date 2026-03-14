@@ -16,8 +16,12 @@ dependencies:
   share_plus: ^12.0.1
   path_provider: ^2.1.4
   shared_preferences: ^2.2.3
+  flutter_secure_storage: ^9.2.2
   uuid: ^4.5.1
   mobile_scanner: ^5.2.3
+  camera: ^0.11.0
+  rectangle_detector: ^1.0.5
+  image: ^4.8.0
   http: ^1.2.2
   html: ^0.15.4
 dev_dependencies:
