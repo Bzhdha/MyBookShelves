@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
 /// Télécharge une couverture (depuis coverUrl) et la stocke dans /documents/covers/.
+/// Gère aussi la sauvegarde des photos prises au scan (couverture et dos).
 class CoverCacheService {
   Future<Directory> coversDir() async {
     final doc = await getApplicationDocumentsDirectory();
@@ -13,6 +14,27 @@ class CoverCacheService {
       await dir.create(recursive: true);
     }
     return dir;
+  }
+
+  /// Sauvegarde une image locale (bytes JPEG) pour un livre.
+  /// [suffix] : 'cover' => couverture (fichier bookId.jpg), 'back' => dos (bookId_back.jpg).
+  /// Retourne le chemin du fichier.
+  Future<String> saveLocalImage({
+    required String bookId,
+    required List<int> imageBytes,
+    String suffix = 'cover',
+  }) async {
+    final dir = await coversDir();
+    final name = suffix == 'cover' ? bookId : '${bookId}_back';
+    final path = p.join(dir.path, '$name.jpg');
+    await File(path).writeAsBytes(imageBytes, flush: true);
+    return path;
+  }
+
+  /// Retourne le chemin attendu pour la photo du dos (sans vérifier l'existence).
+  Future<String> backCoverPathForBook(String bookId) async {
+    final dir = await coversDir();
+    return p.join(dir.path, '${bookId}_back.jpg');
   }
 
   /// Retourne le path local (ou null si échec).

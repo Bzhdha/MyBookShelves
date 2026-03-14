@@ -36,5 +36,9 @@ class BooksRepository {
   /// Recherche d'œuvres par ISBN.
   Future<List<Book>> findWorksByIsbn(String isbn) =>
       _db.findWorksByIsbn(isbn);
+
+  /// Met à jour le chemin de la couverture locale (après prise au scan).
+  Future<void> updateBookCoverLocalPath(String bookId, String? coverLocalPath) =>
+      _db.updateBookCoverLocalPath(bookId, coverLocalPath);
 }
 

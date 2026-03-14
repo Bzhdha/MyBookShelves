@@ -60,7 +60,8 @@ class BookService {
   }
 
   /// Ajout ou enrichissement via scan ISBN, puis création d'un exemplaire.
-  Future<void> addOrUpdateFromIsbnScan(String isbn) async {
+  /// Retourne l'id du livre (œuvre) pour permettre la mise à jour des photos couverture/dos.
+  Future<String> addOrUpdateFromIsbnScan(String isbn) async {
     final works = await _repo.findWorksByIsbn(isbn);
 
     late String bookId;
@@ -183,6 +184,12 @@ class BookService {
         updatedAt: DateTime.now(),
       ),
     );
+    return bookId;
+  }
+
+  /// Met à jour la couverture du livre après prise de photo au scan.
+  Future<void> updateBookCoverFromScan(String bookId, String coverLocalPath) async {
+    await _repo.updateBookCoverLocalPath(bookId, coverLocalPath);
   }
 }
 
