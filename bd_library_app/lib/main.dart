@@ -9,6 +9,10 @@ import 'features/books/data/metadata_service.dart';
 import 'features/books/data/cover_cache_service.dart';
 import 'features/books/data/open_library_provider.dart';
 import 'features/books/data/bdtheque_provider.dart';
+import 'features/books/data/chatgpt_provider.dart';
+import 'features/books/data/claude_provider.dart';
+import 'features/books/data/mistral_provider.dart';
+import 'features/books/data/groq_provider.dart';
 import 'features/books/domain/book_service.dart';
 import 'features/books/ui/book_detail_page.dart';
 import 'features/books/ui/add_book_page.dart';
@@ -17,25 +21,52 @@ import 'features/users/domain/active_user_store.dart';
 import 'features/users/ui/users_page.dart';
 import 'features/import_export/data/library_transfer_service.dart';
 import 'features/import_export/ui/import_review_page.dart';
+import 'features/settings/data/llm_key_store.dart';
+import 'features/settings/data/scan_settings_store.dart';
+import 'features/settings/ui/api_key_page.dart';
+import 'features/books/data/cover_scan_service.dart';
+import 'features/shelves/data/shelves_repository.dart';
+import 'features/shelves/domain/shelf_service.dart';
+import 'features/shelves/ui/shelves_page.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final db = AppDb();
   final booksRepository = BooksRepository(db);
-  final bookService = BookService(
-    booksRepository,
-  MetadataService(
+  final shelvesRepository = ShelvesRepository(db);
+  final shelfService = ShelfService(shelvesRepository);
+  final llmKeyStore = LlmKeyStore();
+  await llmKeyStore.load();
+  final scanSettingsStore = ScanSettingsStore();
+  await scanSettingsStore.load();
+  final metadataService = MetadataService(
     openLibrary: OpenLibraryProvider(),
     bdTheque: BdThequeProvider(),
-  ),
-  CoverCacheService(),
+    llmProviders: [
+      ChatGptProvider(llmKeyStore),
+      ClaudeProvider(llmKeyStore),
+      MistralProvider(llmKeyStore),
+      GroqProvider(llmKeyStore),
+    ],
+  );
+  final coverCacheService = CoverCacheService();
+  final bookService = BookService(
+    booksRepository,
+    metadataService,
+    coverCacheService,
   );
 
   runApp(
     MultiProvider(
       providers: [
         Provider<AppDb>.value(value: db),
+        ChangeNotifierProvider<LlmKeyStore>.value(value: llmKeyStore),
+        Provider<MetadataService>.value(value: metadataService),
+        Provider<CoverCacheService>.value(value: coverCacheService),
         Provider<BookService>.value(value: bookService),
+        Provider<ShelfService>.value(value: shelfService),
+        ChangeNotifierProvider<ScanSettingsStore>.value(value: scanSettingsStore),
+        Provider<CoverScanService>.value(value: CoverScanService()),
         ChangeNotifierProvider(create: (_) => ActiveUserStore()..load()),
       ],
       child: const MyApp(),
@@ -142,6 +173,26 @@ class HomePage extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const AddBookPage()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.menu_book),
+            tooltip: 'Étagères thématiques',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ShelvesPage()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.key),
+            tooltip: 'Clés API (recherche par ChatGPT, Claude, Mistral, Groq)',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ApiKeyPage()),
               );
             },
           ),

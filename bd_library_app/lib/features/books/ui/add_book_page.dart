@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:drift/drift.dart' hide Column;
 
 import '../domain/book_service.dart';
 import '../data/metadata_service.dart';
-import '../data/open_library_provider.dart';
-import '../data/bdtheque_provider.dart';
 
 class AddBookPage extends StatefulWidget {
   const AddBookPage({super.key});
@@ -21,10 +18,6 @@ class _AddBookPageState extends State<AddBookPage> {
   final _publisherCtrl = TextEditingController();
   final _publishedDateCtrl = TextEditingController();
 
-  final _metadataService = MetadataService(
-    openLibrary: OpenLibraryProvider(),
-    bdTheque: BdThequeProvider(),);
-
   bool _loadingIsbn = false;
 
   Future<void> _searchByIsbn() async {
@@ -33,7 +26,8 @@ class _AddBookPageState extends State<AddBookPage> {
 
     setState(() => _loadingIsbn = true);
     try {
-      final meta = await _metadataService.enrichFromIsbn(raw);
+      final metadataService = context.read<MetadataService>();
+      final meta = await metadataService.enrichFromIsbn(raw);
 
       if (meta != null) {
         // Ne pas écraser si l'utilisateur a déjà saisi

@@ -1,14 +1,17 @@
 import '../../../models/bd_metadata.dart';
 import 'bdtheque_provider.dart';
+import 'llm_metadata_provider.dart';
 import 'open_library_provider.dart';
 
 class MetadataService {
   final OpenLibraryProvider openLibrary;
   final BdThequeProvider bdTheque;
+  final List<LlmMetadataProvider> llmProviders;
 
   MetadataService({
     required this.openLibrary,
     required this.bdTheque,
+    this.llmProviders = const [],
   });
 
   Future<BdMetadata?> enrichFromIsbn(String isbn13) async {
@@ -17,14 +20,27 @@ class MetadataService {
       _safeFetchOpenLibrary(isbn13),
     ]);
 
-    final bdMeta = results[0];
-    final olMeta = results[1];
+    BdMetadata? bdMeta = results[0];
+    BdMetadata? olMeta = results[1];
 
     if (bdMeta == null && olMeta == null) {
+      for (final provider in llmProviders) {
+        if (!provider.isConfigured) continue;
+        final meta = await _safeFetchLlm(provider, isbn13);
+        if (meta != null) return meta;
+      }
       return null;
     }
 
     return _mergeBdFirst(bdMeta, olMeta);
+  }
+
+  Future<BdMetadata?> _safeFetchLlm(LlmMetadataProvider provider, String isbn) async {
+    try {
+      return await provider.fetchByIsbn(isbn);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<BdMetadata?> _safeFetchBdTheque(String isbn) async {
