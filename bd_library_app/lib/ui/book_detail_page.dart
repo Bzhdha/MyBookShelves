@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../db/app_db.dart';
 import '../features/books/domain/book_service.dart';
 import 'copy_form_page.dart';
+import 'copy_my_review_page.dart';
 
 class BookDetailPage extends StatefulWidget {
   final String bookId;
@@ -111,6 +112,19 @@ class _BookDetailPageState extends State<BookDetailPage> {
                       if (c.location != null) 'Lieu: ${c.location}',
                       if (c.review.isNotEmpty) 'Avis: ${c.review}',
                     ].join(' • ')),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.rate_review_outlined),
+                      tooltip: 'Mon avis (famille)',
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CopyMyReviewPage(copyId: c.id),
+                          ),
+                        );
+                        await _load();
+                      },
+                    ),
                     onTap: () async {
                       await Navigator.push(
                         context,

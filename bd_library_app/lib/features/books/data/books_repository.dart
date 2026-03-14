@@ -10,6 +10,10 @@ class BooksRepository {
   /// Flux de tous les livres ordonnés par titre.
   Stream<List<Book>> watchAllBooks() => _db.watchAllBooks();
 
+  /// Flux des livres avec le nom de la série (pour affichage liste).
+  Stream<List<(Book, String?)>> watchAllBooksWithSeriesNames() =>
+      _db.watchAllBooksWithSeriesNames();
+
   /// Détails d'un livre.
   Future<Book?> getBookById(String id) => _db.getBookById(id);
 

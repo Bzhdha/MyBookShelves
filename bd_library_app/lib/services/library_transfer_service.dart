@@ -153,6 +153,73 @@ class LibraryTransferService {
   }
 
   /// ----------------------------
+  /// EXPORT JSON (contenu BDD seul, sans couvertures)
+  /// ----------------------------
+  Future<File> exportToJsonFile() async {
+    final allSeries = await db.getAllSeries();
+    final allBooks = await db.getAllBooks();
+
+    final allCopies = <Copy>[];
+    for (final b in allBooks) {
+      final cs = await db.getCopiesByBook(b.id);
+      allCopies.addAll(cs);
+    }
+
+    final payload = ExportLibrary(
+      version: 2,
+      exportedAt: DateTime.now(),
+      series: allSeries
+          .map((s) => ExportSeries(
+                id: s.id,
+                name: s.name,
+                expectedVolumes: s.expectedVolumes,
+                tags: s.tags,
+                updatedAt: s.updatedAt,
+              ))
+          .toList(),
+      books: allBooks
+          .map((b) => ExportBook(
+                id: b.id,
+                isbn: b.isbn,
+                title: b.title,
+                seriesId: b.seriesId,
+                volumeNumber: b.volumeNumber,
+                authors: b.authors,
+                publisher: b.publisher,
+                publishedDate: b.publishedDate,
+                coverUrl: b.coverUrl,
+                tags: b.tags,
+                updatedAt: b.updatedAt,
+              ))
+          .toList(),
+      copies: allCopies
+          .map((c) => ExportCopy(
+                id: c.id,
+                bookId: c.bookId,
+                rating: c.rating,
+                review: c.review,
+                condition: c.condition,
+                location: c.location,
+                notes: c.notes,
+                updatedAt: c.updatedAt,
+              ))
+          .toList(),
+    );
+
+    final tmp = await getTemporaryDirectory();
+    final jsonPath = p.join(tmp.path, 'bd_library_export.json');
+    final jsonBytes = utf8.encode(const JsonEncoder.withIndent('  ').convert(payload.toJson()));
+    final file = File(jsonPath);
+    await file.writeAsBytes(jsonBytes);
+    return file;
+  }
+
+  Future<void> shareExportJson() async {
+    final file = await exportToJsonFile();
+    await Share.shareXFiles([XFile(file.path)], text: 'Export bibliothèque BD (JSON)');
+  }
+
+  /// ----------------------------
   /// PICK ZIP
   /// ----------------------------
   Future<File?> pickZipFile() async {
@@ -165,11 +232,31 @@ class LibraryTransferService {
   }
 
   /// ----------------------------
+  /// PICK JSON
+  /// ----------------------------
+  Future<File?> pickJsonFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+    if (result == null || result.files.single.path == null) return null;
+    return File(result.files.single.path!);
+  }
+
+  /// ----------------------------
   /// BUILD PLAN (matching + conflits)
   /// ----------------------------
   Future<ImportPlan> buildImportPlanFromZip(File zipFile) async {
     final lib = await _readLibraryJsonFromZip(zipFile);
+    return _buildImportPlanFromLibrary(lib);
+  }
 
+  Future<ImportPlan> buildImportPlanFromJson(File jsonFile) async {
+    final lib = await _readLibraryJsonFromFile(jsonFile);
+    return _buildImportPlanFromLibrary(lib);
+  }
+
+  Future<ImportPlan> _buildImportPlanFromLibrary(ExportLibrary lib) async {
     // 1) Upsert series (on pourrait détecter conflit de renommage, etc.)
     final seriesToUpsert = lib.series;
 
@@ -376,13 +463,122 @@ class LibraryTransferService {
       }
     }
 
-    // 5) extract covers from zip -> /documents/covers
+    // 5) extract covers from zip -> /documents/covers (ZIP uniquement)
     await _extractCoversToAppDir(zipFile);
 
-    // 6) relier coverLocalPath (par convention: <bookId>.<ext>)
+    // 6) relier coverLocalPath (par convention: <bookId>.<ext>) (ZIP uniquement)
     await _linkCoversToBooks();
 
-    // 7) upsert copies (rating/review au niveau exemplaire)
+    await _applyImportPlanCopies(plan);
+  }
+
+  /// Applique un plan d'import sans fichier ZIP (JSON seul : pas d'extraction de couvertures).
+  /// Complète la base existante (séries, livres, exemplaires).
+  Future<void> applyImportPlanFromJson(ImportPlan plan) async {
+    // 1) upsert series (dernière modif gagne)
+    for (final s in plan.seriesToUpsert) {
+      final existing = await db.getSeriesById(s.id);
+      if (existing == null || s.updatedAt.isAfter(existing.updatedAt)) {
+        await db.upsertSeries(SeriesCompanion.insert(
+          id: s.id,
+          name: s.name,
+          expectedVolumes: Value(s.expectedVolumes),
+          tags: s.tags,
+          updatedAt: s.updatedAt,
+        ));
+      }
+    }
+
+    // 2) create works (books)
+    for (final b in plan.booksToCreate) {
+      await db.upsertBook(BooksCompanion.insert(
+        id: b.id,
+        isbn: Value(b.isbn),
+        title: b.title,
+        seriesId: Value(b.seriesId),
+        volumeNumber: Value(b.volumeNumber),
+        authors: b.authors,
+        publisher: Value(b.publisher),
+        publishedDate: Value(b.publishedDate),
+        coverUrl: Value(b.coverUrl),
+        coverLocalPath: const Value(null),
+        tags: b.tags,
+        updatedAt: b.updatedAt,
+      ));
+    }
+
+    // 3) update no-conflict (import wins if newer)
+    for (final entry in plan.booksToUpdateNoConflict) {
+      final localId = entry.key;
+      final imp = entry.value;
+      final local = await db.getBookById(localId);
+      if (local == null) continue;
+
+      if (imp.updatedAt.isAfter(local.updatedAt)) {
+        await db.upsertBook(BooksCompanion(
+          id: Value(localId),
+          isbn: Value(imp.isbn),
+          title: Value(imp.title),
+          seriesId: Value(imp.seriesId),
+          volumeNumber: Value(imp.volumeNumber),
+          authors: Value(imp.authors),
+          publisher: Value(imp.publisher),
+          publishedDate: Value(imp.publishedDate),
+          coverUrl: Value(imp.coverUrl),
+          tags: Value(imp.tags),
+          updatedAt: Value(imp.updatedAt),
+        ));
+      }
+    }
+
+    // 4) conflicts (respect choice)
+    for (final c in plan.conflicts) {
+      final localId = c.localBookId;
+      final local = await db.getBookById(localId);
+      if (local == null) continue;
+
+      switch (c.choice) {
+        case ConflictChoice.keepLocal:
+          break;
+        case ConflictChoice.keepImported:
+          await db.upsertBook(BooksCompanion(
+            id: Value(localId),
+            isbn: Value(c.imported.isbn),
+            title: Value(c.imported.title),
+            seriesId: Value(c.imported.seriesId),
+            volumeNumber: Value(c.imported.volumeNumber),
+            authors: Value(c.imported.authors),
+            publisher: Value(c.imported.publisher),
+            publishedDate: Value(c.imported.publishedDate),
+            coverUrl: Value(c.imported.coverUrl),
+            tags: Value(c.imported.tags),
+            updatedAt: Value(c.imported.updatedAt),
+          ));
+          break;
+        case ConflictChoice.merge:
+          final merged = _mergeWork(local, c.imported);
+          await db.upsertBook(BooksCompanion(
+            id: Value(localId),
+            isbn: Value(merged.isbn),
+            title: Value(merged.title),
+            seriesId: Value(merged.seriesId),
+            volumeNumber: Value(merged.volumeNumber),
+            authors: Value(merged.authors),
+            publisher: Value(merged.publisher),
+            publishedDate: Value(merged.publishedDate),
+            coverUrl: Value(merged.coverUrl),
+            tags: Value(merged.tags),
+            updatedAt: Value(DateTime.now()),
+          ));
+          break;
+      }
+    }
+
+    // 5) upsert copies (rating/review au niveau exemplaire)
+    await _applyImportPlanCopies(plan);
+  }
+
+  Future<void> _applyImportPlanCopies(ImportPlan plan) async {
     for (final cp in plan.copiesToUpsert) {
       final mappedBookId = plan.importedWorkIdToLocalWorkId[cp.bookId] ?? cp.bookId;
 
@@ -397,6 +593,12 @@ class LibraryTransferService {
         updatedAt: cp.updatedAt,
       ));
     }
+  }
+
+  Future<ExportLibrary> _readLibraryJsonFromFile(File jsonFile) async {
+    final jsonText = await jsonFile.readAsString();
+    final map = jsonDecode(jsonText) as Map<String, dynamic>;
+    return ExportLibrary.fromJson(map);
   }
 
   /// ----------------------------

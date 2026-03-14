@@ -208,6 +208,17 @@ class AppDb extends _$AppDb {
   Stream<List<Book>> watchAllBooks() =>
     (select(books)..orderBy([(t) => OrderingTerm.asc(t.title)])).watch();
 
+  /// Flux des livres avec le nom de la série (pour affichage liste).
+  Stream<List<(Book, String?)>> watchAllBooksWithSeriesNames() async* {
+    await for (final bookList in watchAllBooks()) {
+      final allSeries = await getAllSeries();
+      final seriesNameById = {for (final s in allSeries) s.id: s.name};
+      yield bookList.map((b) => (
+        b,
+        b.seriesId != null ? seriesNameById[b.seriesId] : null,
+      )).toList();
+    }
+  }
 }
 
 LazyDatabase _openConnection() {

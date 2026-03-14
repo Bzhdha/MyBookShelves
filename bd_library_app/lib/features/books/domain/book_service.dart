@@ -17,6 +17,10 @@ class BookService {
   /// Flux de tous les livres.
   Stream<List<Book>> watchAllBooks() => _repo.watchAllBooks();
 
+  /// Flux des livres avec le nom de la série (pour affichage liste).
+  Stream<List<(Book, String?)>> watchAllBooksWithSeriesNames() =>
+      _repo.watchAllBooksWithSeriesNames();
+
   /// Détails d'un livre + exemplaires.
   Future<Book?> getBook(String id) => _repo.getBookById(id);
   Future<List<Copy>> getCopies(String bookId) => _repo.getCopiesByBook(bookId);
@@ -73,6 +77,10 @@ class BookService {
           : '';
 
       final coverUrl = meta?.coverUrl;
+      final volumeNumber = meta?.volumeNumber != null &&
+              meta!.volumeNumber!.trim().isNotEmpty
+          ? int.tryParse(meta.volumeNumber!)
+          : null;
       final newBookId = _uuid.v4();
 
       final coverLocalPath = await _covers.downloadCoverToLocalPath(
@@ -90,6 +98,7 @@ class BookService {
           publishedDate: Value(meta?.publishedDate),
           coverUrl: Value(coverUrl),
           coverLocalPath: Value(coverLocalPath),
+          volumeNumber: Value(volumeNumber),
           updatedAt: DateTime.now(),
         ),
       );
@@ -104,7 +113,8 @@ class BookService {
           (existing.publisher == null || existing.publisher!.trim().isEmpty) ||
           (existing.publishedDate == null ||
               existing.publishedDate!.trim().isEmpty) ||
-          (existing.coverUrl == null || existing.coverUrl!.trim().isEmpty);
+          (existing.coverUrl == null || existing.coverUrl!.trim().isEmpty) ||
+          existing.volumeNumber == null;
 
       if (missingCoreInfo) {
         final meta = await _metadata.enrichFromIsbn(isbn);
@@ -124,6 +134,12 @@ class BookService {
               (existing.coverUrl == null || existing.coverUrl!.trim().isEmpty)
                   ? meta.coverUrl
                   : existing.coverUrl;
+
+          final newVolumeNumber = (existing.volumeNumber == null &&
+                  meta.volumeNumber != null &&
+                  meta.volumeNumber!.trim().isNotEmpty)
+              ? int.tryParse(meta.volumeNumber!)
+              : existing.volumeNumber;
 
           String? newCoverLocalPath = existing.coverLocalPath;
           if ((newCoverLocalPath == null || newCoverLocalPath.trim().isEmpty) &&
@@ -152,6 +168,7 @@ class BookService {
               ),
               coverUrl: Value(newCoverUrl),
               coverLocalPath: Value(newCoverLocalPath),
+              volumeNumber: Value(newVolumeNumber),
               updatedAt: Value(DateTime.now()),
             ),
           );
