@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
@@ -71,7 +72,8 @@ class _CopyMyReviewPageState extends State<CopyMyReviewPage> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: status,
+                    key: ValueKey(meta?.id ?? 'loading'),
+                    initialValue: status,
                     decoration: const InputDecoration(labelText: 'Statut'),
                     items: const [
                       DropdownMenuItem(value: 'owned', child: Text('Possédé')),
@@ -100,11 +102,11 @@ class _CopyMyReviewPageState extends State<CopyMyReviewPage> {
                             id: id,
                             userId: userId,
                             copyId: widget.copyId,
-                            rating: rating.clamp(0, 5),
-                            review: review,
-                            status: status,
-                            loanedToUserId: const Value(null),
-                            loanedAt: const Value(null),
+                            rating: Value(rating.clamp(0, 5)),
+                            review: Value(review),
+                            status: Value(status),
+                            loanedToUserId: Value(null),
+                            loanedAt: Value(null),
                             updatedAt: DateTime.now(),
                           ));
                       if (context.mounted) Navigator.pop(context);
