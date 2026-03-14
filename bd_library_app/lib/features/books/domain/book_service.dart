@@ -17,6 +17,10 @@ class BookService {
   /// Flux de tous les livres.
   Stream<List<Book>> watchAllBooks() => _repo.watchAllBooks();
 
+  /// Flux des livres avec le nom de la série (pour affichage liste).
+  Stream<List<(Book, String?)>> watchAllBooksWithSeriesNames() =>
+      _repo.watchAllBooksWithSeriesNames();
+
   /// Détails d'un livre + exemplaires.
   Future<Book?> getBook(String id) => _repo.getBookById(id);
   Future<List<Copy>> getCopies(String bookId) => _repo.getCopiesByBook(bookId);
