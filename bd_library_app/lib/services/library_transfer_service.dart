@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:archive/archive.dart';
 import 'package:archive/archive_io.dart';
+import 'package:drift/drift.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -367,7 +368,7 @@ class LibraryTransferService {
           id: s.id,
           name: s.name,
           expectedVolumes: Value(s.expectedVolumes),
-          tags: s.tags,
+          tags: Value(s.tags),
           updatedAt: s.updatedAt,
         ));
       }
@@ -381,12 +382,12 @@ class LibraryTransferService {
         title: b.title,
         seriesId: Value(b.seriesId),
         volumeNumber: Value(b.volumeNumber),
-        authors: b.authors,
+        authors: Value(b.authors),
         publisher: Value(b.publisher),
         publishedDate: Value(b.publishedDate),
         coverUrl: Value(b.coverUrl),
-        coverLocalPath: const Value(null),
-        tags: b.tags,
+        coverLocalPath: Value(null),
+        tags: Value(b.tags),
         updatedAt: b.updatedAt,
       ));
     }
@@ -483,7 +484,7 @@ class LibraryTransferService {
           id: s.id,
           name: s.name,
           expectedVolumes: Value(s.expectedVolumes),
-          tags: s.tags,
+          tags: Value(s.tags),
           updatedAt: s.updatedAt,
         ));
       }
@@ -497,12 +498,12 @@ class LibraryTransferService {
         title: b.title,
         seriesId: Value(b.seriesId),
         volumeNumber: Value(b.volumeNumber),
-        authors: b.authors,
+        authors: Value(b.authors),
         publisher: Value(b.publisher),
         publishedDate: Value(b.publishedDate),
         coverUrl: Value(b.coverUrl),
-        coverLocalPath: const Value(null),
-        tags: b.tags,
+        coverLocalPath: Value(null),
+        tags: Value(b.tags),
         updatedAt: b.updatedAt,
       ));
     }
@@ -585,11 +586,11 @@ class LibraryTransferService {
       await db.upsertCopy(CopiesCompanion.insert(
         id: cp.id,
         bookId: mappedBookId,
-        rating: cp.rating.clamp(0, 5),
-        review: cp.review,
-        condition: cp.condition.clamp(1, 5),
+        rating: Value(cp.rating.clamp(0, 5)),
+        review: Value(cp.review),
+        condition: Value(cp.condition.clamp(1, 5)),
         location: Value(cp.location),
-        notes: cp.notes,
+        notes: Value(cp.notes),
         updatedAt: cp.updatedAt,
       ));
     }
@@ -694,7 +695,7 @@ class LibraryTransferService {
       return aa.isNotEmpty ? aa : (b?.trim().isNotEmpty == true ? b!.trim() : null);
     }
 
-    String mergeTags(String localTags, String impTags) {
+    List<String> mergeTags(String localTags, String impTags) {
       final set = <String>{};
       for (final t in localTags.split(',')) {
         final x = t.trim();
@@ -704,11 +705,11 @@ class LibraryTransferService {
         final x = t.trim();
         if (x.isNotEmpty) set.add(x);
       }
-      return set.toList()..sort();
+      final list = set.toList()..sort();
+      return list;
     }
 
-    final mergedTagsList = (mergeTags(local.tags, imp.tags) as dynamic);
-    final mergedTags = (mergedTagsList is List) ? (mergedTagsList as List).join(', ') : mergedTagsList.toString();
+    final mergedTags = mergeTags(local.tags, imp.tags).join(', ');
 
     return ExportBook(
       id: local.id,
