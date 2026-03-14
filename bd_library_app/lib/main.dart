@@ -7,6 +7,7 @@ import 'ui/book_detail_page.dart';
 import 'ui/add_book_page.dart';
 import 'ui/users_page.dart';
 import 'ui/isbn_scanner_page.dart';
+import 'ui/import_review_page.dart';
 import 'features/books/data/books_repository.dart';
 import 'features/books/domain/book_service.dart';
 import 'services/metadata_service.dart';
@@ -64,6 +65,42 @@ class HomePage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Bibliothèque BD'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.upload),
+            tooltip: 'Importer depuis JSON',
+            onPressed: () async {
+              final db = context.read<AppDb>();
+              final transfer = LibraryTransferService(db);
+              try {
+                final file = await transfer.pickJsonFile();
+                if (file == null || !context.mounted) return;
+                final plan = await transfer.buildImportPlanFromJson(file);
+                if (!context.mounted) return;
+                await Navigator.push<void>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ImportReviewPage(
+                      plan: plan,
+                      onApply: (p) async {
+                        await transfer.applyImportPlanFromJson(p);
+                      },
+                    ),
+                  ),
+                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Import terminé')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Erreur import: $e')),
+                  );
+                }
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.download),
             tooltip: 'Exporter en JSON',
