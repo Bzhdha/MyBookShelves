@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' hide Column;
 import '../features/books/domain/book_service.dart';
 import '../services/metadata_service.dart';
 import '../services/open_library_provider.dart';
+import '../services/bdtheque_provider.dart';
 
 class AddBookPage extends StatefulWidget {
   const AddBookPage({super.key});
@@ -20,8 +21,9 @@ class _AddBookPageState extends State<AddBookPage> {
   final _publisherCtrl = TextEditingController();
   final _publishedDateCtrl = TextEditingController();
 
-  final _metadataService =
-      MetadataService(openLibrary: OpenLibraryProvider());
+  final _metadataService = MetadataService(
+    openLibrary: OpenLibraryProvider(),
+    bdTheque: BdThequeProvider(),);
 
   bool _loadingIsbn = false;
 

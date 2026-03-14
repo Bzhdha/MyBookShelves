@@ -12,6 +12,7 @@ import 'features/books/domain/book_service.dart';
 import 'services/metadata_service.dart';
 import 'services/open_library_provider.dart';
 import 'services/cover_cache_service.dart';
+import 'services/bdtheque_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,8 +20,11 @@ void main() {
   final booksRepository = BooksRepository(db);
   final bookService = BookService(
     booksRepository,
-    MetadataService(openLibrary: OpenLibraryProvider()),
-    CoverCacheService(),
+  MetadataService(
+    openLibrary: OpenLibraryProvider(),
+    bdTheque: BdThequeProvider(),
+  ),
+  CoverCacheService(),
   );
 
   runApp(

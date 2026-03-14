@@ -5,6 +5,7 @@ class BdMetadata {
   final String? publishedDate;
   final String? description;
   final String? coverUrl;
+  final String? volumeNumber;
 
   BdMetadata({
     this.title,
@@ -13,5 +14,6 @@ class BdMetadata {
     this.publishedDate,
     this.description,
     this.coverUrl,
+    this.volumeNumber,
   });
 }
