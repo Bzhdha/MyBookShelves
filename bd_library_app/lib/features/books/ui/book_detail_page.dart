@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../db/app_db.dart';
-import '../features/books/domain/book_service.dart';
+import '../../../db/app_db.dart';
+import '../domain/book_service.dart';
 import 'copy_form_page.dart';
-import 'copy_my_review_page.dart';
+import '../../users/ui/copy_my_review_page.dart';
 
 class BookDetailPage extends StatefulWidget {
   final String bookId;

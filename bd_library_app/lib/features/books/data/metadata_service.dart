@@ -1,4 +1,4 @@
-import '../models/bd_metadata.dart';
+import '../../../models/bd_metadata.dart';
 import 'bdtheque_provider.dart';
 import 'open_library_provider.dart';
 

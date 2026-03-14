@@ -10,8 +10,9 @@ Liste des actions à mener (architecture & sécurisation).
 
 ## À faire
 
-- [ ] **Structuration par features**  
-  Introduire une structure par feature (`books`, `users`, `family`, `import_export`) avec séparation `data` / `domain` / `ui`.
+- [x] **Structuration par features**  
+  Introduire une structure par feature (`books`, `users`, `family`, `import_export`) avec séparation `data` / `domain` / `ui`.  
+  *Fait :* `lib/features/` avec `books` (data: repository, metadata, cover, providers ; domain: BookService ; ui: book_detail, add_book, isbn_scanner, copy_form), `users` (domain: ActiveUserStore ; ui: users_page, copy_my_review_page), `family` (data: FamilyTransferService), `import_export` (data: LibraryTransferService ; ui: import_review_page). `lib/db/` et `lib/models/` restent partagés à la racine.
 
 - [ ] **Validation ISBN**  
   Renforcer la validation et la normalisation des ISBN (formulaire et scanner) avant tout appel réseau (longueur, chiffres, préfixe 978/979, etc.).

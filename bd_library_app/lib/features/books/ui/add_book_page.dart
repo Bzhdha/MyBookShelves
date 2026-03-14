@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:drift/drift.dart' hide Column;
 
-import '../features/books/domain/book_service.dart';
-import '../services/metadata_service.dart';
-import '../services/open_library_provider.dart';
-import '../services/bdtheque_provider.dart';
+import '../domain/book_service.dart';
+import '../data/metadata_service.dart';
+import '../data/open_library_provider.dart';
+import '../data/bdtheque_provider.dart';
 
 class AddBookPage extends StatefulWidget {
   const AddBookPage({super.key});

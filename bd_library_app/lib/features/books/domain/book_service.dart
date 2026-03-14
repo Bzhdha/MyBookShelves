@@ -2,8 +2,8 @@ import 'package:drift/drift.dart' hide Column;
 import 'package:uuid/uuid.dart';
 
 import '../data/books_repository.dart';
-import '../../../services/metadata_service.dart';
-import '../../../services/cover_cache_service.dart';
+import '../data/metadata_service.dart';
+import '../data/cover_cache_service.dart';
 import '../../../db/app_db.dart';
 
 class BookService {

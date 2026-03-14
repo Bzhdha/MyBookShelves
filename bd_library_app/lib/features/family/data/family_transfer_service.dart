@@ -2,14 +2,15 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
+import 'package:drift/drift.dart';
 import 'package:archive/archive_io.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../db/app_db.dart';
-import '../models/export_model.dart';
+import '../../../db/app_db.dart';
+import '../../../models/export_model.dart';
 
 /// Extension export/import "famille" (v3) :
 /// - Ajoute users + userCopyMeta au même ZIP
@@ -173,11 +174,11 @@ class FamilyTransferService {
       final incomingUpdatedAt = DateTime.parse(u['updatedAt'] as String);
 
       if (existing == null || incomingUpdatedAt.isAfter(existing.updatedAt)) {
-        await db.into(db.users).insertOnConflictUpdate(UsersCompanion.insert(
-              id: id,
-              displayName: u['displayName'] as String,
-              avatar: (u['avatar'] as String?) ?? '',
-              updatedAt: incomingUpdatedAt,
+        await db.into(db.users).insertOnConflictUpdate(UsersCompanion(
+              id: Value(id),
+              displayName: Value(u['displayName'] as String),
+              avatar: Value((u['avatar'] as String?) ?? ''),
+              updatedAt: Value(incomingUpdatedAt),
             ));
       }
     }
@@ -188,16 +189,16 @@ class FamilyTransferService {
       final incomingUpdatedAt = DateTime.parse(m['updatedAt'] as String);
 
       if (existing == null || incomingUpdatedAt.isAfter(existing.updatedAt)) {
-        await db.into(db.userCopyMetas).insertOnConflictUpdate(UserCopyMetasCompanion.insert(
-              id: id,
-              userId: m['userId'] as String,
-              copyId: m['copyId'] as String,
-              rating: (m['rating'] as num?)?.toInt() ?? 0,
-              review: (m['review'] as String?) ?? '',
-              status: (m['status'] as String?) ?? 'owned',
+        await db.into(db.userCopyMetas).insertOnConflictUpdate(UserCopyMetasCompanion(
+              id: Value(id),
+              userId: Value(m['userId'] as String),
+              copyId: Value(m['copyId'] as String),
+              rating: Value((m['rating'] as num?)?.toInt() ?? 0),
+              review: Value((m['review'] as String?) ?? ''),
+              status: Value((m['status'] as String?) ?? 'owned'),
               loanedToUserId: Value(m['loanedToUserId'] as String?),
               loanedAt: Value(m['loanedAt'] == null ? null : DateTime.parse(m['loanedAt'] as String)),
-              updatedAt: incomingUpdatedAt,
+              updatedAt: Value(incomingUpdatedAt),
             ));
       }
     }

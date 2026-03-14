@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'db/app_db.dart';
-import 'state/active_user_store.dart';
-import 'ui/book_detail_page.dart';
-import 'ui/add_book_page.dart';
-import 'ui/users_page.dart';
-import 'ui/isbn_scanner_page.dart';
-import 'ui/import_review_page.dart';
 import 'features/books/data/books_repository.dart';
+import 'features/books/data/metadata_service.dart';
+import 'features/books/data/cover_cache_service.dart';
+import 'features/books/data/open_library_provider.dart';
+import 'features/books/data/bdtheque_provider.dart';
 import 'features/books/domain/book_service.dart';
-import 'services/metadata_service.dart';
-import 'services/open_library_provider.dart';
-import 'services/cover_cache_service.dart';
-import 'services/bdtheque_provider.dart';
-import 'services/library_transfer_service.dart';
+import 'features/books/ui/book_detail_page.dart';
+import 'features/books/ui/add_book_page.dart';
+import 'features/books/ui/isbn_scanner_page.dart';
+import 'features/users/domain/active_user_store.dart';
+import 'features/users/ui/users_page.dart';
+import 'features/import_export/data/library_transfer_service.dart';
+import 'features/import_export/ui/import_review_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();

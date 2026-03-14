@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
-import '../features/books/domain/book_service.dart';
+import '../domain/book_service.dart';
 
 class IsbnScannerPage extends StatefulWidget {
   const IsbnScannerPage({super.key});
@@ -19,7 +19,7 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
   );
 
   String? _pendingIsbn; // ISBN en attente de validation
-  String? _lastAcceptedIsbn; // anti doublon “validation”
+  String? _lastAcceptedIsbn; // anti doublon "validation"
   DateTime? _lastAcceptedAt;
 
   bool get _isPausedForValidation => _pendingIsbn != null;

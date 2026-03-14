@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html_parser;
-import '../models/bd_metadata.dart';
+import '../../../models/bd_metadata.dart';
 
 class OpenLibraryProvider {
   Future<BdMetadata?> fetchByIsbn(String isbn13) async {
