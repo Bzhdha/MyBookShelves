@@ -19,8 +19,10 @@ import 'features/books/ui/add_book_page.dart';
 import 'features/books/ui/isbn_scanner_page.dart';
 import 'features/users/domain/active_user_store.dart';
 import 'features/users/ui/users_page.dart';
+import 'features/import_export/data/imported_library_store.dart';
 import 'features/import_export/data/library_transfer_service.dart';
 import 'features/import_export/ui/import_review_page.dart';
+import 'features/import_export/ui/imported_libraries_list_page.dart';
 import 'features/settings/data/llm_key_store.dart';
 import 'features/settings/data/scan_settings_store.dart';
 import 'features/settings/ui/api_key_page.dart';
@@ -67,6 +69,7 @@ Future<void> main() async {
         Provider<ShelfService>.value(value: shelfService),
         ChangeNotifierProvider<ScanSettingsStore>.value(value: scanSettingsStore),
         Provider<CoverScanService>.value(value: CoverScanService()),
+        Provider<ImportedLibraryStore>.value(value: ImportedLibraryStore()),
         ChangeNotifierProvider(create: (_) => ActiveUserStore()..load()),
       ],
       child: const MyApp(),
@@ -87,8 +90,30 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() => _searchQuery = _searchController.text.trim());
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -135,6 +160,18 @@ class HomePage extends StatelessWidget {
             },
           ),
           IconButton(
+            icon: const Icon(Icons.people_outline),
+            tooltip: 'Bibliothèques importées (amis)',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ImportedLibrariesListPage(),
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.download),
             tooltip: 'Exporter en JSON',
             onPressed: () async {
@@ -158,7 +195,7 @@ class HomePage extends StatelessWidget {
           ),
           IconButton(
             icon: const Icon(Icons.group),
-            tooltip: 'Membres de la famille',
+            tooltip: 'Membres (utilisateurs)',
             onPressed: () {
               Navigator.push(
                 context,
@@ -198,6 +235,35 @@ class HomePage extends StatelessWidget {
           ),
         ],
       ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Rechercher (auteur, titre ou ISBN)…',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => _searchController.clear(),
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+              ),
+            ),
+          ),
+          Expanded(
+            child: _searchQuery.isEmpty
+                ? _buildBookStream(context, bookService)
+                : _buildSearchResults(context, bookService),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
@@ -207,65 +273,91 @@ class HomePage extends StatelessWidget {
         },
         child: const Icon(Icons.qr_code_scanner),
       ),
-      body: StreamBuilder<List<(Book, String?)>>(
-        stream: bookService.watchAllBooksWithSeriesNames(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final items = snapshot.data!;
-          if (items.isEmpty) {
-            return const Center(child: Text("Aucune BD enregistrée"));
-          }
-          return ListView(
-            children: items.map((entry) {
-              final b = entry.$1;
-              final seriesName = entry.$2;
-              final hasTitle = b.title.trim().isNotEmpty;
-              final titleDisplay = hasTitle
-                  ? b.title
-                  : (b.isbn != null && b.isbn!.trim().isNotEmpty
-                      ? 'ISBN ${b.isbn}'
-                      : 'Sans titre');
-              final parts = <String>[
-                if (b.volumeNumber != null) 'T. ${b.volumeNumber}',
-                if (seriesName != null && seriesName.trim().isNotEmpty) seriesName,
-                if (b.authors.trim().isNotEmpty) b.authors,
-              ];
-              final subtitleDisplay = parts.isNotEmpty
-                  ? parts.join(' · ')
-                  : (b.isbn != null && b.isbn!.trim().isNotEmpty && hasTitle
-                      ? 'ISBN ${b.isbn}'
-                      : null);
-              final coverPath = b.coverLocalPath;
-              final hasCoverPath = coverPath != null && coverPath.trim().isNotEmpty;
-              return ListTile(
-                leading: SizedBox(
-                  width: 40,
-                  height: 56,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: hasCoverPath
-                        ? Image.file(
-                            File(coverPath),
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                HomePage._coverPlaceholder(),
-                          )
-                        : HomePage._coverPlaceholder(),
-                  ),
-                ),
-                title: Text(titleDisplay),
-                subtitle: subtitleDisplay != null ? Text(subtitleDisplay) : null,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => BookDetailPage(bookId: b.id)),
-                ),
-              );
-            }).toList(),
-          );
-        },
-      ),
+    );
+  }
+
+  Widget _buildBookStream(BuildContext context, BookService bookService) {
+    return StreamBuilder<List<(Book, String?)>>(
+      stream: bookService.watchAllBooksWithSeriesNames(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final items = snapshot.data!;
+        return _buildBookList(context, items);
+      },
+    );
+  }
+
+  Widget _buildSearchResults(BuildContext context, BookService bookService) {
+    return FutureBuilder<List<(Book, String?)>>(
+      future: bookService.searchBooksWithSeriesNames(_searchQuery),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final items = snapshot.data!;
+        return _buildBookList(context, items);
+      },
+    );
+  }
+
+  Widget _buildBookList(
+    BuildContext context,
+    List<(Book, String?)> items,
+  ) {
+    if (items.isEmpty) {
+      return Center(
+        child: Text(
+          _searchQuery.isEmpty ? 'Aucune BD enregistrée' : 'Aucun résultat',
+        ),
+      );
+    }
+    return ListView(
+      children: items.map((entry) {
+        final b = entry.$1;
+        final seriesName = entry.$2;
+        final hasTitle = b.title.trim().isNotEmpty;
+        final titleDisplay = hasTitle
+            ? b.title
+            : (b.isbn != null && b.isbn!.trim().isNotEmpty
+                ? 'ISBN ${b.isbn}'
+                : 'Sans titre');
+        final parts = <String>[
+          if (b.volumeNumber != null) 'T. ${b.volumeNumber}',
+          if (seriesName != null && seriesName.trim().isNotEmpty) seriesName,
+          if (b.authors.trim().isNotEmpty) b.authors,
+        ];
+        final subtitleDisplay = parts.isNotEmpty
+            ? parts.join(' · ')
+            : (b.isbn != null && b.isbn!.trim().isNotEmpty && hasTitle
+                ? 'ISBN ${b.isbn}'
+                : null);
+        final coverPath = b.coverLocalPath;
+        final hasCoverPath = coverPath != null && coverPath.trim().isNotEmpty;
+        return ListTile(
+          leading: SizedBox(
+            width: 40,
+            height: 56,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: hasCoverPath
+                  ? Image.file(
+                      File(coverPath),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _coverPlaceholder(),
+                    )
+                  : _coverPlaceholder(),
+            ),
+          ),
+          title: Text(titleDisplay),
+          subtitle: subtitleDisplay != null ? Text(subtitleDisplay) : null,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => BookDetailPage(bookId: b.id)),
+          ),
+        );
+      }).toList(),
     );
   }
 

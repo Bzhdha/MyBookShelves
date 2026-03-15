@@ -25,7 +25,22 @@ class BookService {
   Future<Book?> getBook(String id) => _repo.getBookById(id);
   Future<List<Copy>> getCopies(String bookId) => _repo.getCopiesByBook(bookId);
 
+  /// Recherche par titre, auteur ou ISBN (même partiel). Retourne les livres avec le nom de série.
+  Future<List<(Book, String?)>> searchBooksWithSeriesNames(String query) async {
+    final list = await _repo.searchBooks(query);
+    if (list.isEmpty) return [];
+    final allSeries = await _repo.getSeriesAll();
+    final seriesNameById = {for (final s in allSeries) s.id: s.name};
+    return list
+        .map((b) => (
+              b,
+              b.seriesId != null ? seriesNameById[b.seriesId] : null,
+            ))
+        .toList();
+  }
+
   Future<void> deleteBook(String id) => _repo.deleteBookById(id);
+  Future<void> deleteCopy(String id) => _repo.deleteCopyById(id);
 
   /// Création / mise à jour d'un exemplaire (formulaire exemplaire).
   Future<void> upsertCopy(CopiesCompanion copy) => _repo.upsertCopy(copy);

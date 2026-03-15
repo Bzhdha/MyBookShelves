@@ -167,6 +167,27 @@ class AppDb extends _$AppDb {
   Future<List<Book>> findWorksByIsbn(String isbn) =>
       (select(books)..where((t) => t.isbn.equals(isbn))).get();
 
+  /// Recherche partielle par titre, auteur ou ISBN (sensible à la casse selon le moteur).
+  Future<List<Book>> searchBooks(String query) {
+    final q = query.trim();
+    if (q.isEmpty) return getAllBooks();
+    final pattern = '%${_escapeLike(q)}%';
+    return (select(books)
+          ..where((t) =>
+              t.title.like(pattern) |
+              t.authors.like(pattern) |
+              (t.isbn.isNotNull() & t.isbn.like(pattern)))
+          ..orderBy([(t) => OrderingTerm.asc(t.title)]))
+        .get();
+  }
+
+  static String _escapeLike(String s) {
+    return s
+        .replaceAll(r'\', r'\\')
+        .replaceAll('%', r'\%')
+        .replaceAll('_', r'\_');
+  }
+
   Future<List<Book>> getBooksBySeries(String seriesId) =>
       (select(books)
             ..where((t) => t.seriesId.equals(seriesId))
@@ -258,6 +279,12 @@ class AppDb extends _$AppDb {
   }
 
   /// --------------------
+  /// Users (membres famille)
+  /// --------------------
+  Future<List<User>> getAllUsers() =>
+      (select(users)..orderBy([(t) => OrderingTerm.asc(t.displayName)])).get();
+
+  /// --------------------
   /// Series incomplete (Mode A)
   /// --------------------
   Future<List<SeriesData>> getIncompleteSeriesModeA() async {
@@ -283,6 +310,18 @@ class AppDb extends _$AppDb {
 
 
   // refresh the list of books
+  /// Métas (avis / prêt) de l'utilisateur pour une liste d'exemplaires.
+  Future<List<UserCopyMeta>> getMetasForUserForCopies(
+    String userId,
+    List<String> copyIds,
+  ) {
+    if (copyIds.isEmpty) return Future.value([]);
+    return (select(userCopyMetas)
+          ..where((t) =>
+              t.userId.equals(userId) & t.copyId.isIn(copyIds)))
+        .get();
+  }
+
   Stream<List<Book>> watchAllBooks() =>
     (select(books)..orderBy([(t) => OrderingTerm.asc(t.title)])).watch();
 

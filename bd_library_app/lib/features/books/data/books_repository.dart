@@ -7,6 +7,8 @@ class BooksRepository {
 
   BooksRepository(this._db);
 
+  Future<List<SeriesData>> getSeriesAll() => _db.getAllSeries();
+
   /// Flux de tous les livres ordonnés par titre.
   Stream<List<Book>> watchAllBooks() => _db.watchAllBooks();
 
@@ -36,6 +38,9 @@ class BooksRepository {
   /// Recherche d'œuvres par ISBN.
   Future<List<Book>> findWorksByIsbn(String isbn) =>
       _db.findWorksByIsbn(isbn);
+
+  /// Recherche partielle par titre, auteur ou ISBN.
+  Future<List<Book>> searchBooks(String query) => _db.searchBooks(query);
 
   /// Met à jour le chemin de la couverture locale (après prise au scan).
   Future<void> updateBookCoverLocalPath(String bookId, String? coverLocalPath) =>
