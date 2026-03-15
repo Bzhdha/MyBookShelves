@@ -18,13 +18,8 @@ class GroqProvider implements LlmMetadataProvider {
   String? get _apiKey => _keyStore.getKey(LlmProvider.groq);
 
   static const _systemPrompt = '''
-Tu es un assistant qui renvoie les métadonnées de livres ou bandes dessinées à partir d'un numéro ISBN.
-Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, avec les champs suivants (utilise null si inconnu) :
-- "title" (string) : titre du livre ou de la série
-- "authors" (array de strings) : noms des auteurs
-- "publisher" (string) : éditeur
-- "publishedDate" (string) : année ou date de publication
-- "volumeNumber" (string) : numéro de tome si BD (ex: "1", "2")
+Tu réponds UNIQUEMENT par un objet JSON valide, sans texte avant ou après.
+Si tu ne trouves aucune information pour l'ISBN demandé, retourne un objet vide : {}.
 ''';
 
   @override
@@ -32,17 +27,15 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, avec 
     final key = _apiKey;
     if (key == null || key.trim().isEmpty) return null;
 
+    final userContent = llmIsbnSearchUserPromptTemplate.replaceAll('[INSÉRER_ISBN_ICI]', isbn);
+
     try {
       final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
       final body = {
         'model': 'llama-3.3-70b-versatile',
         'messages': [
           {'role': 'system', 'content': _systemPrompt},
-          {
-            'role': 'user',
-            'content':
-                'Donne les métadonnées du livre ou de la BD pour l\'ISBN suivant : $isbn',
-          },
+          {'role': 'user', 'content': userContent},
         ],
         'response_format': {'type': 'json_object'},
         'max_tokens': 500,
