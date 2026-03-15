@@ -19,8 +19,10 @@ class _CopyMyReviewPageState extends State<CopyMyReviewPage> {
   int condition = 3; // optionnel perso, si tu veux le personnaliser, sinon ignore
   String review = '';
   String status = 'owned';
+  String? loanedToUserId;
 
   UserCopyMeta? meta;
+  List<User> _users = [];
 
   @override
   void didChangeDependencies() {
@@ -37,11 +39,16 @@ class _CopyMyReviewPageState extends State<CopyMyReviewPage> {
           ..where((t) => t.userId.equals(userId) & t.copyId.equals(widget.copyId)))
         .getSingleOrNull();
 
+    final users = await db.getAllUsers();
+
+    if (!mounted) return;
     setState(() {
       meta = existing;
       rating = existing?.rating ?? 0;
       review = existing?.review ?? '';
       status = existing?.status ?? 'owned';
+      loanedToUserId = existing?.loanedToUserId;
+      _users = users;
     });
   }
 
@@ -73,7 +80,7 @@ class _CopyMyReviewPageState extends State<CopyMyReviewPage> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     key: ValueKey(meta?.id ?? 'loading'),
-                    initialValue: status,
+                    value: status,
                     decoration: const InputDecoration(labelText: 'Statut'),
                     items: const [
                       DropdownMenuItem(value: 'owned', child: Text('Possédé')),
@@ -82,6 +89,27 @@ class _CopyMyReviewPageState extends State<CopyMyReviewPage> {
                       DropdownMenuItem(value: 'wishlist', child: Text('Wishlist')),
                     ],
                     onChanged: (v) => setState(() => status = v ?? 'owned'),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String?>(
+                    value: loanedToUserId,
+                    decoration: const InputDecoration(
+                      labelText: 'Prêté à',
+                      hintText: '—',
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('—'),
+                      ),
+                      ..._users
+                          .where((u) => u.id != userId)
+                          .map((u) => DropdownMenuItem<String?>(
+                                value: u.id,
+                                child: Text(u.displayName),
+                              )),
+                    ],
+                    onChanged: (v) => setState(() => loanedToUserId = v),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -105,8 +133,8 @@ class _CopyMyReviewPageState extends State<CopyMyReviewPage> {
                             rating: Value(rating.clamp(0, 5)),
                             review: Value(review),
                             status: Value(status),
-                            loanedToUserId: Value(null),
-                            loanedAt: Value(null),
+                            loanedToUserId: Value(loanedToUserId),
+                            loanedAt: Value(loanedToUserId != null ? DateTime.now() : null),
                             updatedAt: DateTime.now(),
                           ));
                       if (context.mounted) Navigator.pop(context);

@@ -232,6 +232,25 @@ class LibraryTransferService {
     return File(result.files.single.path!);
   }
 
+  /// Charge une bibliothèque depuis un fichier JSON ou ZIP (sans l'importer en BDD).
+  Future<ExportLibrary?> readLibraryFromFile(File file) async {
+    final path = file.path.toLowerCase();
+    if (path.endsWith('.zip')) {
+      return _readLibraryJsonFromZip(file);
+    }
+    return _readLibraryJsonFromFile(file);
+  }
+
+  /// Choisir un fichier bibliothèque (JSON ou ZIP).
+  Future<File?> pickLibraryFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json', 'zip'],
+    );
+    if (result == null || result.files.single.path == null) return null;
+    return File(result.files.single.path!);
+  }
+
   /// ----------------------------
   /// PICK JSON
   /// ----------------------------
