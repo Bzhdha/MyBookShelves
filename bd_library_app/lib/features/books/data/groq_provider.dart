@@ -68,4 +68,47 @@ Si tu ne trouves aucune information pour l'ISBN demandé, retourne un objet vide
       return null;
     }
   }
+
+  @override
+  Future<LlmPromptResult?> fetchWithUserPrompt(String userPrompt) async {
+    final key = _apiKey;
+    if (key == null || key.trim().isEmpty) return null;
+    try {
+      final uri = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
+      final body = {
+        'model': 'llama-3.3-70b-versatile',
+        'messages': [
+          {'role': 'system', 'content': _systemPrompt},
+          {'role': 'user', 'content': userPrompt},
+        ],
+        'response_format': {'type': 'json_object'},
+        'max_tokens': 500,
+      };
+      final response = await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $key',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return null;
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final choices = decoded['choices'] as List<dynamic>?;
+      if (choices == null || choices.isEmpty) return null;
+      final message = (choices.first as Map<String, dynamic>)['message'] as Map<String, dynamic>?;
+      final text = message?['content'] as String?;
+      if (text == null || text.trim().isEmpty) return null;
+      BdMetadata? parsed;
+      try {
+        final meta = jsonDecode(text) as Map<String, dynamic>;
+        parsed = parseLlmMetadataJson(meta);
+      } catch (_) {}
+      return (rawResponse: text, parsed: parsed);
+    } catch (_) {
+      return null;
+    }
+  }
 }

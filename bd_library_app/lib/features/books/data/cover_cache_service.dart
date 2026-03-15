@@ -37,6 +37,19 @@ class CoverCacheService {
     return p.join(dir.path, '${bookId}_back.jpg');
   }
 
+  /// Échange le contenu des fichiers couverture et dos (inverser les images).
+  /// [coverPath] : chemin actuel de la couverture (ex. .../covers/<bookId>.jpg).
+  /// [backPath] : chemin du dos (ex. .../covers/<bookId>_back.jpg).
+  Future<void> swapCoverAndBack(String coverPath, String backPath) async {
+    final coverFile = File(coverPath);
+    final backFile = File(backPath);
+    if (!await coverFile.exists() || !await backFile.exists()) return;
+    final coverBytes = await coverFile.readAsBytes();
+    final backBytes = await backFile.readAsBytes();
+    await backFile.writeAsBytes(coverBytes, flush: true);
+    await coverFile.writeAsBytes(backBytes, flush: true);
+  }
+
   /// Retourne le path local (ou null si échec).
   /// Le fichier est nommé "<bookId>.<ext>"
   Future<String?> downloadCoverToLocalPath({

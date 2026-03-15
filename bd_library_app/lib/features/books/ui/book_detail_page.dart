@@ -9,6 +9,8 @@ import '../domain/book_service.dart';
 import '../../shelves/domain/shelf_service.dart';
 import '../../users/domain/active_user_store.dart';
 import 'copy_form_page.dart';
+import 'cover_photo_page.dart';
+import 'edit_book_page.dart';
 import '../../users/ui/copy_my_review_page.dart';
 
 class BookDetailPage extends StatefulWidget {
@@ -77,6 +79,19 @@ class _BookDetailPageState extends State<BookDetailPage> {
       appBar: AppBar(
         title: Text(book!.title),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            tooltip: 'Modifier le livre',
+            onPressed: () async {
+              await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => EditBookPage(book: book!),
+                ),
+              );
+              if (mounted) await _load();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.delete),
             tooltip: 'Supprimer le livre',
@@ -193,7 +208,6 @@ class _BookDetailPageState extends State<BookDetailPage> {
     final coverPath = book!.coverLocalPath;
     final hasCover = coverPath != null && coverPath.trim().isNotEmpty && File(coverPath).existsSync();
     final hasBack = _backCoverPath != null && File(_backCoverPath!).existsSync();
-    if (!hasCover && !hasBack) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,23 +216,99 @@ class _BookDetailPageState extends State<BookDetailPage> {
           'Photos',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 8),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
           children: [
-            if (hasCover)
-              Expanded(
-                child: _coverImage(coverPath),
-              ),
-            if (hasCover && hasBack) const SizedBox(width: 12),
-            if (hasBack && _backCoverPath != null)
-              Expanded(
-                child: _coverImage(_backCoverPath!, label: 'Dos'),
+            TextButton.icon(
+              icon: const Icon(Icons.photo_camera, size: 18),
+              label: const Text('Modifier couverture'),
+              onPressed: () => _replaceCoverOrBack(context, isCover: true),
+            ),
+            TextButton.icon(
+              icon: const Icon(Icons.photo_camera, size: 18),
+              label: const Text('Modifier dos'),
+              onPressed: () => _replaceCoverOrBack(context, isCover: false),
+            ),
+            if (hasCover && hasBack)
+              TextButton.icon(
+                icon: const Icon(Icons.swap_horiz, size: 18),
+                label: const Text('Inverser couverture et dos'),
+                onPressed: () => _swapCoverAndBack(context),
               ),
           ],
         ),
+        if (!hasCover && !hasBack)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text(
+              'Aucune photo. Utilisez « Modifier couverture » ou « Modifier dos » pour ajouter des images.',
+              style: TextStyle(color: Colors.grey),
+            ),
+          )
+        else ...[
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (hasCover)
+                Expanded(
+                  child: _coverImage(coverPath),
+                ),
+              if (hasCover && hasBack) const SizedBox(width: 12),
+              if (hasBack && _backCoverPath != null)
+                Expanded(
+                  child: _coverImage(_backCoverPath!, label: 'Dos'),
+                ),
+            ],
+          ),
+        ],
       ],
     );
+  }
+
+  Future<void> _replaceCoverOrBack(BuildContext context, {required bool isCover}) async {
+    final result = await Navigator.push<CoverPhotoResult>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CoverPhotoPage(
+          bookId: widget.bookId,
+          onlySuffix: isCover ? 'cover' : 'back',
+        ),
+      ),
+    );
+    if (!mounted || result == null) return;
+    if (isCover && result.coverPath != null) {
+      await context.read<BookService>().updateBookCoverFromScan(widget.bookId, result.coverPath!);
+    }
+    await _load();
+  }
+
+  Future<void> _swapCoverAndBack(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Inverser couverture et dos'),
+        content: const Text(
+          'Les deux images seront échangées. Cette action est immédiate.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Inverser'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await context.read<BookService>().swapCoverAndBack(widget.bookId);
+    if (!mounted) return;
+    await _load();
   }
 
   Widget _coverImage(String path, {String? label}) {
