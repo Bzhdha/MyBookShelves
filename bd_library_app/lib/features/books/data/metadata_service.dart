@@ -1,3 +1,4 @@
+import '../../../core/app_logger.dart';
 import '../../../models/bd_metadata.dart';
 import 'bdtheque_provider.dart';
 import 'llm_metadata_provider.dart';
@@ -7,14 +8,33 @@ class MetadataService {
   final OpenLibraryProvider openLibrary;
   final BdThequeProvider bdTheque;
   final List<LlmMetadataProvider> llmProviders;
+  final AppLogger? logger;
 
   MetadataService({
     required this.openLibrary,
     required this.bdTheque,
     this.llmProviders = const [],
+    this.logger,
   });
 
+  /// Lance une recherche via le premier LLM configuré avec le prompt utilisateur donné.
+  /// Retourne la réponse brute et les métadonnées parsées (si le JSON est valide).
+  Future<LlmPromptResult?> enrichFromCustomUserPrompt(String userPrompt) async {
+    logger?.log('MetadataService.enrichFromCustomUserPrompt', {'promptLength': userPrompt.length});
+    for (final provider in llmProviders) {
+      if (!provider.isConfigured) continue;
+      try {
+        final result = await provider.fetchWithUserPrompt(userPrompt);
+        if (result != null) return result;
+      } catch (_) {
+        continue;
+      }
+    }
+    return null;
+  }
+
   Future<BdMetadata?> enrichFromIsbn(String isbn13) async {
+    logger?.log('MetadataService.enrichFromIsbn', {'isbn': isbn13});
     final results = await Future.wait<BdMetadata?>([
       _safeFetchBdTheque(isbn13),
       _safeFetchOpenLibrary(isbn13),
@@ -36,6 +56,7 @@ class MetadataService {
   }
 
   Future<BdMetadata?> _safeFetchLlm(LlmMetadataProvider provider, String isbn) async {
+    logger?.log('MetadataService._safeFetchLlm', {'provider': provider.runtimeType.toString(), 'isbn': isbn});
     try {
       return await provider.fetchByIsbn(isbn);
     } catch (_) {
@@ -44,6 +65,7 @@ class MetadataService {
   }
 
   Future<BdMetadata?> _safeFetchBdTheque(String isbn) async {
+    logger?.log('MetadataService._safeFetchBdTheque', {'isbn': isbn});
     try {
       return await bdTheque.fetchByIsbn(isbn);
     } catch (_) {
@@ -52,6 +74,7 @@ class MetadataService {
   }
 
   Future<BdMetadata?> _safeFetchOpenLibrary(String isbn) async {
+    logger?.log('MetadataService._safeFetchOpenLibrary', {'isbn': isbn});
     try {
       return await openLibrary.fetchByIsbn(isbn);
     } catch (_) {

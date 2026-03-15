@@ -1,9 +1,15 @@
 import '../../../models/bd_metadata.dart';
 
+/// Résultat d'une recherche par prompt personnalisé : réponse brute du LLM et métadonnées parsées (si possible).
+typedef LlmPromptResult = ({String rawResponse, BdMetadata? parsed});
+
 /// Interface commune pour les fournisseurs de métadonnées via API LLM (OpenAI, Claude, Mistral, Groq).
 abstract class LlmMetadataProvider {
   bool get isConfigured;
   Future<BdMetadata?> fetchByIsbn(String isbn);
+
+  /// Appelle le LLM avec le message utilisateur donné et retourne la réponse brute + métadonnées parsées.
+  Future<LlmPromptResult?> fetchWithUserPrompt(String userPrompt);
 }
 
 /// Prompt utilisateur pour la recherche ISBN par IA (remplacer [INSÉRER_ISBN_ICI] par l'ISBN).

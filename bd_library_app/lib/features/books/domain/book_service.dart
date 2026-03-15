@@ -1,18 +1,22 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart' hide Column;
 import 'package:uuid/uuid.dart';
 
 import '../data/books_repository.dart';
 import '../data/metadata_service.dart';
 import '../data/cover_cache_service.dart';
+import '../../../core/app_logger.dart';
 import '../../../db/app_db.dart';
 
 class BookService {
   final BooksRepository _repo;
   final MetadataService _metadata;
   final CoverCacheService _covers;
+  final AppLogger? _logger;
   final _uuid = const Uuid();
 
-  BookService(this._repo, this._metadata, this._covers);
+  BookService(this._repo, this._metadata, this._covers, [this._logger]);
 
   /// Flux de tous les livres.
   Stream<List<Book>> watchAllBooks() => _repo.watchAllBooks();
@@ -22,11 +26,15 @@ class BookService {
       _repo.watchAllBooksWithSeriesNames();
 
   /// Détails d'un livre + exemplaires.
-  Future<Book?> getBook(String id) => _repo.getBookById(id);
+  Future<Book?> getBook(String id) {
+    _logger?.log('BookService.getBook', {'id': id});
+    return _repo.getBookById(id);
+  }
   Future<List<Copy>> getCopies(String bookId) => _repo.getCopiesByBook(bookId);
 
   /// Recherche par titre, auteur ou ISBN (même partiel). Retourne les livres avec le nom de série.
   Future<List<(Book, String?)>> searchBooksWithSeriesNames(String query) async {
+    _logger?.log('BookService.searchBooksWithSeriesNames', {'query': query});
     final list = await _repo.searchBooks(query);
     if (list.isEmpty) return [];
     final allSeries = await _repo.getSeriesAll();
@@ -39,8 +47,15 @@ class BookService {
         .toList();
   }
 
-  Future<void> deleteBook(String id) => _repo.deleteBookById(id);
-  Future<void> deleteCopy(String id) => _repo.deleteCopyById(id);
+  Future<void> deleteBook(String id) {
+    _logger?.log('BookService.deleteBook', {'id': id});
+    return _repo.deleteBookById(id);
+  }
+
+  Future<void> deleteCopy(String id) {
+    _logger?.log('BookService.deleteCopy', {'id': id});
+    return _repo.deleteCopyById(id);
+  }
 
   /// Création / mise à jour d'un exemplaire (formulaire exemplaire).
   Future<void> upsertCopy(CopiesCompanion copy) => _repo.upsertCopy(copy);
@@ -54,6 +69,11 @@ class BookService {
     String? publishedDate,
     String? coverUrl,
   }) async {
+    _logger?.log('BookService.addBookManually', {
+      'isbn': isbn,
+      'title': title,
+      'authors': authors,
+    });
     final id = _uuid.v4();
 
     await _repo.upsertBook(
@@ -77,6 +97,7 @@ class BookService {
   /// Ajout ou enrichissement via scan ISBN, puis création d'un exemplaire.
   /// Retourne l'id du livre (œuvre) pour permettre la mise à jour des photos couverture/dos.
   Future<String> addOrUpdateFromIsbnScan(String isbn) async {
+    _logger?.log('BookService.addOrUpdateFromIsbnScan', {'isbn': isbn});
     final works = await _repo.findWorksByIsbn(isbn);
 
     late String bookId;
@@ -204,7 +225,53 @@ class BookService {
 
   /// Met à jour la couverture du livre après prise de photo au scan.
   Future<void> updateBookCoverFromScan(String bookId, String coverLocalPath) async {
+    _logger?.log('BookService.updateBookCoverFromScan', {
+      'bookId': bookId,
+      'coverLocalPath': coverLocalPath,
+    });
     await _repo.updateBookCoverLocalPath(bookId, coverLocalPath);
+  }
+
+  /// Met à jour les champs métadonnées d'un livre (titre, auteurs, isbn, etc.).
+  Future<void> updateBookDetails(
+    String id, {
+    String? title,
+    String? authors,
+    String? isbn,
+    String? publisher,
+    String? publishedDate,
+    int? volumeNumber,
+  }) async {
+    _logger?.log('BookService.updateBookDetails', {'id': id});
+    final existing = await _repo.getBookById(id);
+    if (existing == null) return;
+    await _repo.upsertBook(
+      BooksCompanion(
+        id: Value(id),
+        isbn: Value(isbn ?? existing.isbn),
+        title: Value(title ?? existing.title),
+        seriesId: Value(existing.seriesId),
+        volumeNumber: Value(volumeNumber ?? existing.volumeNumber),
+        authors: Value(authors ?? existing.authors),
+        publisher: Value(publisher ?? existing.publisher),
+        publishedDate: Value(publishedDate ?? existing.publishedDate),
+        coverUrl: Value(existing.coverUrl),
+        coverLocalPath: Value(existing.coverLocalPath),
+        tags: Value(existing.tags),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  /// Inverse la couverture et le dos (échange le contenu des deux images).
+  Future<void> swapCoverAndBack(String bookId) async {
+    _logger?.log('BookService.swapCoverAndBack', {'bookId': bookId});
+    final b = await _repo.getBookById(bookId);
+    if (b?.coverLocalPath == null || b!.coverLocalPath!.trim().isEmpty) return;
+    final backPath = await _covers.backCoverPathForBook(bookId);
+    final backFile = File(backPath);
+    if (!await backFile.exists()) return;
+    await _covers.swapCoverAndBack(b.coverLocalPath!, backPath);
   }
 }
 

@@ -19,13 +19,17 @@ class CoverPhotoResult {
 
 /// Page de prise de photo de la couverture puis du dos du livre.
 /// Après chaque prise, l'utilisateur trace un cadre (bords déplaçables) pour recadrer, puis valide.
+/// Si [onlySuffix] est 'cover' ou 'back', une seule photo est prise puis retournée.
 class CoverPhotoPage extends StatefulWidget {
   const CoverPhotoPage({
     super.key,
     required this.bookId,
+    this.onlySuffix,
   });
 
   final String bookId;
+  /// 'cover' = uniquement couverture, 'back' = uniquement dos. Null = couverture puis dos.
+  final String? onlySuffix;
 
   @override
   State<CoverPhotoPage> createState() => _CoverPhotoPageState();
@@ -35,7 +39,7 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
   CameraController? _controller;
   bool _isProcessing = false;
   String? _error;
-  bool _phaseCover = true;
+  late bool _phaseCover;
 
   /// Phase "recadrage" : image capturée (bytes) et cadre normalisé 0-1 (left, top, right, bottom).
   Uint8List? _capturedImage;
@@ -47,6 +51,7 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
   @override
   void initState() {
     super.initState();
+    _phaseCover = widget.onlySuffix != 'back';
     _initCamera();
   }
 
@@ -158,8 +163,14 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
         suffix: suffix,
       );
       if (!mounted) return;
+      final onlyOne = widget.onlySuffix != null;
       if (_phaseCover) {
         _coverPath = savedPath;
+        if (onlyOne) {
+          setState(() => _isProcessing = false);
+          Navigator.pop(context, CoverPhotoResult(coverPath: savedPath, backPath: null));
+          return;
+        }
         setState(() {
           _phaseCover = false;
           _capturedImage = null;
@@ -170,7 +181,11 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
         );
       } else {
         setState(() => _isProcessing = false);
-        Navigator.pop(context, CoverPhotoResult(coverPath: _coverPath, backPath: savedPath));
+        if (onlyOne) {
+          Navigator.pop(context, CoverPhotoResult(coverPath: null, backPath: savedPath));
+        } else {
+          Navigator.pop(context, CoverPhotoResult(coverPath: _coverPath, backPath: savedPath));
+        }
       }
     } catch (e) {
       if (mounted) {

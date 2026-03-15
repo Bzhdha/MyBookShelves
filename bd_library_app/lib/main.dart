@@ -30,9 +30,13 @@ import 'features/books/data/cover_scan_service.dart';
 import 'features/shelves/data/shelves_repository.dart';
 import 'features/shelves/domain/shelf_service.dart';
 import 'features/shelves/ui/shelves_page.dart';
+import 'core/app_logger.dart';
+import 'features/logs/ui/logs_page.dart';
+import 'features/settings/ui/scan_settings_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final appLogger = AppLogger();
   final db = AppDb();
   final booksRepository = BooksRepository(db);
   final shelvesRepository = ShelvesRepository(db);
@@ -50,12 +54,14 @@ Future<void> main() async {
       MistralProvider(llmKeyStore),
       GroqProvider(llmKeyStore),
     ],
+    logger: appLogger,
   );
   final coverCacheService = CoverCacheService();
   final bookService = BookService(
     booksRepository,
     metadataService,
     coverCacheService,
+    appLogger,
   );
 
   runApp(
@@ -71,6 +77,7 @@ Future<void> main() async {
         Provider<CoverScanService>.value(value: CoverScanService()),
         Provider<ImportedLibraryStore>.value(value: ImportedLibraryStore()),
         ChangeNotifierProvider(create: (_) => ActiveUserStore()..load()),
+        ChangeNotifierProvider<AppLogger>.value(value: appLogger),
       ],
       child: const MyApp(),
     ),
@@ -122,118 +129,169 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Bibliothèque BD'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.upload),
-            tooltip: 'Importer depuis JSON',
-            onPressed: () async {
-              final db = context.read<AppDb>();
-              final transfer = LibraryTransferService(db);
-              try {
-                final file = await transfer.pickJsonFile();
-                if (file == null || !context.mounted) return;
-                final plan = await transfer.buildImportPlanFromJson(file);
-                if (!context.mounted) return;
-                await Navigator.push<void>(
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const DrawerHeader(
+              decoration: BoxDecoration(color: Colors.blue),
+              child: Text(
+                'Bibliothèque BD',
+                style: TextStyle(color: Colors.white, fontSize: 24),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.upload),
+              title: const Text('Importer depuis JSON'),
+              onTap: () async {
+                Navigator.pop(context);
+                context.read<AppLogger>().log('Import JSON (depuis menu)');
+                final db = context.read<AppDb>();
+                final transfer = LibraryTransferService(db);
+                try {
+                  final file = await transfer.pickJsonFile();
+                  if (file == null || !context.mounted) return;
+                  final plan = await transfer.buildImportPlanFromJson(file);
+                  if (!context.mounted) return;
+                  await Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ImportReviewPage(
+                        plan: plan,
+                        onApply: (p) async {
+                          await transfer.applyImportPlanFromJson(p);
+                        },
+                      ),
+                    ),
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Import terminé')),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Erreur import: $e')),
+                    );
+                  }
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.download),
+              title: const Text('Exporter en JSON'),
+              onTap: () async {
+                Navigator.pop(context);
+                context.read<AppLogger>().log('Export JSON (depuis menu)');
+                final db = context.read<AppDb>();
+                final transfer = LibraryTransferService(db);
+                try {
+                  await transfer.shareExportJson();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Export JSON partagé')),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Erreur export: $e')),
+                    );
+                  }
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.people_outline),
+              title: const Text('Bibliothèques importées (amis)'),
+              onTap: () {
+                Navigator.pop(context);
+                context.read<AppLogger>().log('Ouvrir Bibliothèques importées');
+                Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => ImportReviewPage(
-                      plan: plan,
-                      onApply: (p) async {
-                        await transfer.applyImportPlanFromJson(p);
-                      },
-                    ),
+                    builder: (_) => const ImportedLibrariesListPage(),
                   ),
                 );
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Import terminé')),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erreur import: $e')),
-                  );
-                }
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.people_outline),
-            tooltip: 'Bibliothèques importées (amis)',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const ImportedLibrariesListPage(),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.download),
-            tooltip: 'Exporter en JSON',
-            onPressed: () async {
-              final db = context.read<AppDb>();
-              final transfer = LibraryTransferService(db);
-              try {
-                await transfer.shareExportJson();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Export JSON partagé')),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erreur export: $e')),
-                  );
-                }
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.group),
-            tooltip: 'Membres (utilisateurs)',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const UsersPage()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'Ajouter un livre à la main',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AddBookPage()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.menu_book),
-            tooltip: 'Étagères thématiques',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ShelvesPage()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.key),
-            tooltip: 'Clés API (recherche par ChatGPT, Claude, Mistral, Groq)',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ApiKeyPage()),
-              );
-            },
-          ),
-        ],
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.group),
+              title: const Text('Membres (utilisateurs)'),
+              onTap: () {
+                Navigator.pop(context);
+                context.read<AppLogger>().log('Ouvrir Membres');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const UsersPage()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.add),
+              title: const Text('Ajouter un livre à la main'),
+              onTap: () {
+                Navigator.pop(context);
+                context.read<AppLogger>().log('Ouvrir Ajouter un livre');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AddBookPage()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.menu_book),
+              title: const Text('Étagères thématiques'),
+              onTap: () {
+                Navigator.pop(context);
+                context.read<AppLogger>().log('Ouvrir Étagères');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ShelvesPage()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.key),
+              title: const Text('Clés API (recherche LLM)'),
+              onTap: () {
+                Navigator.pop(context);
+                context.read<AppLogger>().log('Ouvrir Clés API');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ApiKeyPage()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('Paramètres scan ISBN'),
+              onTap: () {
+                Navigator.pop(context);
+                context.read<AppLogger>().log('Ouvrir Paramètres scan');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ScanSettingsPage()),
+                );
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.list_alt),
+              title: const Text('Logs applicatifs'),
+              onTap: () {
+                Navigator.pop(context);
+                context.read<AppLogger>().log('Ouvrir Logs applicatifs');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LogsPage()),
+                );
+              },
+            ),
+          ],
+        ),
       ),
       body: Column(
         children: [
@@ -266,6 +324,7 @@ class _HomePageState extends State<HomePage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
+          context.read<AppLogger>().log('Ouvrir scan ISBN');
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const IsbnScannerPage()),
