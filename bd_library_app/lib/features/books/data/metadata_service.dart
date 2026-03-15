@@ -17,6 +17,19 @@ class MetadataService {
     this.logger,
   });
 
+  /// Indique si au moins un fournisseur LLM a une clé API configurée.
+  bool get hasAnyConfiguredLlm => llmProviders.any((p) => p.isConfigured);
+
+  /// Recherche uniquement sur les sources Web (BdTheque, Open Library). Pas de LLM.
+  Future<BdMetadata?> enrichFromIsbnWebOnly(String isbn13) async {
+    logger?.log('MetadataService.enrichFromIsbnWebOnly', {'isbn': isbn13});
+    final results = await Future.wait<BdMetadata?>([
+      _safeFetchBdTheque(isbn13),
+      _safeFetchOpenLibrary(isbn13),
+    ]);
+    return _mergeBdFirst(results[0], results[1]);
+  }
+
   /// Lance une recherche via le premier LLM configuré avec le prompt utilisateur donné.
   /// Retourne la réponse brute et les métadonnées parsées (si le JSON est valide).
   Future<LlmPromptResult?> enrichFromCustomUserPrompt(String userPrompt) async {

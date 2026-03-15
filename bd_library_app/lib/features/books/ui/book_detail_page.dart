@@ -11,6 +11,7 @@ import '../../users/domain/active_user_store.dart';
 import 'copy_form_page.dart';
 import 'cover_photo_page.dart';
 import 'edit_book_page.dart';
+import 'metadata_search_sheet.dart';
 import '../../users/ui/copy_my_review_page.dart';
 
 class BookDetailPage extends StatefulWidget {
@@ -145,6 +146,8 @@ class _BookDetailPageState extends State<BookDetailPage> {
         children: [
           _buildCoversSection(context),
           const SizedBox(height: 16),
+          _buildMetadataSearchSection(context),
+          const SizedBox(height: 16),
           Text('ISBN: ${book!.isbn ?? "-"}'),
           Text('Auteurs: ${book!.authors}'),
           Text('Tome: ${book!.volumeNumber ?? "-"}'),
@@ -201,6 +204,27 @@ class _BookDetailPageState extends State<BookDetailPage> {
                 )),
         ],
       ),
+    );
+  }
+
+  Widget _buildMetadataSearchSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Métadonnées',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 6),
+        TextButton.icon(
+          icon: const Icon(Icons.search, size: 20),
+          label: const Text('Rechercher sur le Web ou par IA'),
+          onPressed: () async {
+            final applied = await MetadataSearchSheet.show(context, book!);
+            if (mounted && applied == true) await _load();
+          },
+        ),
+      ],
     );
   }
 
