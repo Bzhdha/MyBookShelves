@@ -1,9 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../db/app_db.dart';
+import '../data/cover_cache_service.dart';
 import '../domain/book_service.dart';
 import '../../shelves/domain/shelf_service.dart';
+import '../../users/domain/active_user_store.dart';
 import 'copy_form_page.dart';
 import '../../users/ui/copy_my_review_page.dart';
 
@@ -19,6 +23,9 @@ class _BookDetailPageState extends State<BookDetailPage> {
   Book? book;
   List<Copy> copies = [];
   List<Shelf> bookShelves = [];
+  String? _backCoverPath;
+  Map<String, UserCopyMeta> _copyMetas = {};
+  Map<String, String> _userNameById = {};
 
   @override
   void didChangeDependencies() {
@@ -29,16 +36,34 @@ class _BookDetailPageState extends State<BookDetailPage> {
   Future<void> _load() async {
     final bookService = context.read<BookService>();
     final shelfService = context.read<ShelfService>();
+    final coverCache = context.read<CoverCacheService>();
+    final db = context.read<AppDb>();
+    final userId = context.read<ActiveUserStore>().activeUserId;
+
     final b = await bookService.getBook(widget.bookId);
     final c = await bookService.getCopies(widget.bookId);
     final shelfIds = await shelfService.getShelfIdsForBook(widget.bookId);
     final allShelves = await shelfService.getAllShelves();
     final shelves = allShelves.where((s) => shelfIds.contains(s.id)).toList();
+    final backPath = await coverCache.backCoverPathForBook(widget.bookId);
 
+    Map<String, UserCopyMeta> copyMetas = {};
+    Map<String, String> userNameById = {};
+    if (userId != null && c.isNotEmpty) {
+      final metas = await db.getMetasForUserForCopies(userId, c.map((x) => x.id).toList());
+      copyMetas = {for (final m in metas) m.copyId: m};
+      final users = await db.getAllUsers();
+      userNameById = {for (final u in users) u.id: u.displayName};
+    }
+
+    if (!mounted) return;
     setState(() {
       book = b;
       copies = c;
       bookShelves = shelves;
+      _backCoverPath = backPath;
+      _copyMetas = copyMetas;
+      _userNameById = userNameById;
     });
   }
 
@@ -103,6 +128,8 @@ class _BookDetailPageState extends State<BookDetailPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _buildCoversSection(context),
+          const SizedBox(height: 16),
           Text('ISBN: ${book!.isbn ?? "-"}'),
           Text('Auteurs: ${book!.authors}'),
           Text('Tome: ${book!.volumeNumber ?? "-"}'),
@@ -120,19 +147,31 @@ class _BookDetailPageState extends State<BookDetailPage> {
                     subtitle: Text([
                       if (c.location != null) 'Lieu: ${c.location}',
                       if (c.review.isNotEmpty) 'Avis: ${c.review}',
-                    ].join(' • ')),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.rate_review_outlined),
-                      tooltip: 'Mon avis (famille)',
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => CopyMyReviewPage(copyId: c.id),
-                          ),
-                        );
-                        await _load();
-                      },
+                      if (_copyMetas[c.id]?.loanedToUserId != null)
+                        'Prêté à: ${_userNameById[_copyMetas[c.id]!.loanedToUserId] ?? _copyMetas[c.id]!.loanedToUserId}',
+                    ].where((e) => e.isNotEmpty).join(' • ')),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.rate_review_outlined),
+                          tooltip: 'Mon avis (famille)',
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => CopyMyReviewPage(copyId: c.id),
+                              ),
+                            );
+                            await _load();
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          tooltip: 'Supprimer cet exemplaire',
+                          onPressed: () => _confirmDeleteCopy(context, c),
+                        ),
+                      ],
                     ),
                     onTap: () async {
                       await Navigator.push(
@@ -148,6 +187,104 @@ class _BookDetailPageState extends State<BookDetailPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildCoversSection(BuildContext context) {
+    final coverPath = book!.coverLocalPath;
+    final hasCover = coverPath != null && coverPath.trim().isNotEmpty && File(coverPath).existsSync();
+    final hasBack = _backCoverPath != null && File(_backCoverPath!).existsSync();
+    if (!hasCover && !hasBack) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Photos',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (hasCover)
+              Expanded(
+                child: _coverImage(coverPath),
+              ),
+            if (hasCover && hasBack) const SizedBox(width: 12),
+            if (hasBack && _backCoverPath != null)
+              Expanded(
+                child: _coverImage(_backCoverPath!, label: 'Dos'),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _coverImage(String path, {String? label}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (label != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.file(
+            File(path),
+            fit: BoxFit.cover,
+            height: 200,
+            width: double.infinity,
+            errorBuilder: (_, __, ___) => _coverPlaceholder(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _coverPlaceholder() {
+    return Container(
+      height: 200,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Icon(Icons.photo_library_outlined, size: 48),
+    );
+  }
+
+  Future<void> _confirmDeleteCopy(BuildContext context, Copy c) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Supprimer cet exemplaire ?'),
+        content: const Text(
+          'Cette action est irréversible.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    await context.read<BookService>().deleteCopy(c.id);
+    if (!context.mounted) return;
+    await _load();
   }
 
   Widget _buildShelvesSection(BuildContext context) {

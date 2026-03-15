@@ -49,4 +49,29 @@ class CoverScanService {
       return null;
     }
   }
+
+  /// Recadre l'image sur un rectangle défini en pixels (pour sélection manuelle).
+  Uint8List? cropToRect(
+    Uint8List imageBytes, {
+    required int x,
+    required int y,
+    required int width,
+    required int height,
+  }) {
+    try {
+      final decoded = img.decodeImage(imageBytes);
+      if (decoded == null) return null;
+      final x0 = x.clamp(0, decoded.width - 1);
+      final y0 = y.clamp(0, decoded.height - 1);
+      var w = width.clamp(1, decoded.width - x0);
+      var h = height.clamp(1, decoded.height - y0);
+      if (x0 + w > decoded.width) w = decoded.width - x0;
+      if (y0 + h > decoded.height) h = decoded.height - y0;
+      if (w <= 0 || h <= 0) return null;
+      final cropped = img.copyCrop(decoded, x: x0, y: y0, width: w, height: h);
+      return Uint8List.fromList(img.encodeJpg(cropped, quality: 90));
+    } catch (_) {
+      return null;
+    }
+  }
 }
