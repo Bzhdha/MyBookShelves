@@ -7,6 +7,75 @@ import '../../../core/app_logger.dart';
 class LogsPage extends StatelessWidget {
   const LogsPage({super.key});
 
+  static void _showLogDetailDialog(BuildContext context, AppLogEntry e) {
+    final params = e.params!;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        final maxHeight = MediaQuery.sizeOf(ctx).height * 0.7;
+        return AlertDialog(
+          title: Text(e.function),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: 500, maxHeight: maxHeight),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                Text(
+                  _formatTime(e.at),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 12),
+                ...params.entries.map((entry) {
+                  final valueStr = entry.value?.toString() ?? '';
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          entry.key,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: SelectableText(
+                            valueStr,
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Fermer'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   static String _formatTime(DateTime dt) {
     return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:'
@@ -66,6 +135,7 @@ class LogsPage extends StatelessWidget {
             itemBuilder: (context, index) {
               final e = entries[index];
               final timeStr = _formatTime(e.at);
+              final hasParams = e.params != null && e.params!.isNotEmpty;
               return ListTile(
                 title: Text(
                   e.function,
@@ -79,13 +149,18 @@ class LogsPage extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
-                          e.paramsSummary,
+                          e.paramsSummary.length > 120
+                              ? '${e.paramsSummary.substring(0, 120)}…'
+                              : e.paramsSummary,
                           style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
                         ),
                       ),
                   ],
                 ),
                 isThreeLine: e.paramsSummary.isNotEmpty,
+                onTap: hasParams
+                    ? () => _showLogDetailDialog(context, e)
+                    : null,
               );
             },
           );

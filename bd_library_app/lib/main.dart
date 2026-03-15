@@ -51,7 +51,7 @@ Future<void> main() async {
     llmProviders: [
       ChatGptProvider(llmKeyStore),
       ClaudeProvider(llmKeyStore),
-      MistralProvider(llmKeyStore),
+      MistralProvider(llmKeyStore, appLogger),
       GroqProvider(llmKeyStore),
     ],
     logger: appLogger,
