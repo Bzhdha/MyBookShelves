@@ -68,15 +68,24 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
 
     final scanSettings = context.read<ScanSettingsStore>();
     if (scanSettings.photoCoverEnabled && mounted) {
-      final result = await Navigator.push<CoverPhotoResult>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => CoverPhotoPage(bookId: bookId),
-        ),
-      );
-      if (result != null && result.coverPath != null && mounted) {
-        await bookService.updateBookCoverFromScan(bookId, result.coverPath!);
+      try {
+        final result = await Navigator.push<CoverPhotoResult>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CoverPhotoPage(bookId: bookId),
+          ),
+        );
+        if (result != null && result.coverPath != null && mounted) {
+          await bookService.updateBookCoverFromScan(bookId, result.coverPath!);
+        }
+      } finally {
+        // Toujours réactiver le scan pour enchaîner sur un autre code ISBN
+        if (mounted) {
+          setState(() => _pendingIsbn = null);
+          await _controller.start();
+        }
       }
+      return;
     }
 
     if (!mounted) return;

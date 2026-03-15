@@ -220,7 +220,7 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
         fit: StackFit.expand,
         children: [
           FittedBox(
-            fit: BoxFit.cover,
+            fit: BoxFit.contain,
             child: SizedBox(
               width: _controller!.value.previewSize?.width.toDouble() ?? 1,
               height: _controller!.value.previewSize?.height.toDouble() ?? 1,

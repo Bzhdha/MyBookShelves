@@ -6,8 +6,86 @@ abstract class LlmMetadataProvider {
   Future<BdMetadata?> fetchByIsbn(String isbn);
 }
 
+/// Prompt utilisateur pour la recherche ISBN par IA (remplacer [INSÉRER_ISBN_ICI] par l'ISBN).
+const String llmIsbnSearchUserPromptTemplate = '''
+Recherche les informations détaillées pour la bande dessinée ou le livre associé au code ISBN suivant : [INSÉRER_ISBN_ICI].
+
+Fournis le résultat au format JSON strict avec les champs suivants (si disponibles) :
+- "isbn" : le code ISBN,
+- "titre" : le titre complet,
+- "auteurs" : une liste des auteurs/scénaristes/dessinateurs,
+- "éditeur" : le nom de l'éditeur,
+- "collection" : le nom de la collection (si applicable),
+- "type" : "BD", "Manga", "Manhua", "Roman", etc.,
+- "tome" : le numéro du tome (si applicable),
+- "date_parution" : la date de parution (format AAAA-MM-JJ),
+- "résumé" : un résumé court du contenu,
+- "liens" : une liste d'URLs pour plus d'infos (si disponibles).
+
+Si aucune information n'est trouvée pour cet ISBN, retourne un JSON vide : {}.
+''';
+
+/// Parse un objet JSON avec clés françaises (réponse IA) en [BdMetadata]. Retourne null si titre manquant ou {}.
+BdMetadata? parseLlmMetadataJsonFromFrench(Map<String, dynamic> meta) {
+  if (meta.isEmpty) return null;
+
+  String? title;
+  final titre = meta['titre'];
+  if (titre != null && titre.toString().trim().isNotEmpty) {
+    title = titre.toString().trim();
+  }
+  if (title == null || title.isEmpty) return null;
+
+  List<String>? authors;
+  final rawAuthors = meta['auteurs'];
+  if (rawAuthors is List) {
+    authors = rawAuthors
+        .map((e) => e?.toString().trim())
+        .where((s) => s != null && s.isNotEmpty)
+        .cast<String>()
+        .toList();
+    if (authors.isEmpty) authors = null;
+  }
+
+  String? publisher;
+  final editeur = meta['éditeur'];
+  if (editeur != null && editeur.toString().trim().isNotEmpty) {
+    publisher = editeur.toString().trim();
+  }
+
+  String? publishedDate;
+  final dateParution = meta['date_parution'];
+  if (dateParution != null && dateParution.toString().trim().isNotEmpty) {
+    publishedDate = dateParution.toString().trim();
+  }
+
+  String? volumeNumber;
+  final tome = meta['tome'];
+  if (tome != null && tome.toString().trim().isNotEmpty) {
+    volumeNumber = tome.toString().trim();
+  }
+
+  String? description;
+  final resume = meta['résumé'];
+  if (resume != null && resume.toString().trim().isNotEmpty) {
+    description = resume.toString().trim();
+  }
+
+  return BdMetadata(
+    title: title,
+    authors: authors,
+    publisher: publisher,
+    publishedDate: publishedDate,
+    description: description,
+    volumeNumber: volumeNumber,
+  );
+}
+
 /// Parse un objet JSON renvoyé par un LLM en [BdMetadata]. Retourne null si titre manquant.
 BdMetadata? parseLlmMetadataJson(Map<String, dynamic> meta) {
+  final fromFrench = parseLlmMetadataJsonFromFrench(meta);
+  if (fromFrench != null) return fromFrench;
+
   String? title;
   if (meta['title'] != null && meta['title'].toString().trim().isNotEmpty) {
     title = meta['title'].toString().trim();
