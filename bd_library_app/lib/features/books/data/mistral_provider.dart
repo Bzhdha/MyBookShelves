@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../../core/app_logger.dart';
 import '../../../models/bd_metadata.dart';
 import '../../settings/data/llm_key_store.dart';
 import 'llm_metadata_provider.dart';
@@ -9,9 +10,10 @@ import 'llm_metadata_provider.dart';
 /// Fournisseur de métadonnées livre/BD via l'API Mistral.
 /// Format compatible OpenAI (chat completions).
 class MistralProvider implements LlmMetadataProvider {
-  MistralProvider(this._keyStore);
+  MistralProvider(this._keyStore, [this._logger]);
 
   final LlmKeyStore _keyStore;
+  final AppLogger? _logger;
 
   @override
   bool get isConfigured => _keyStore.isConfigured(LlmProvider.mistral);
@@ -62,6 +64,13 @@ Si tu ne trouves aucune information pour l'ISBN demandé, retourne un objet vide
       final message = (choices.first as Map<String, dynamic>)['message'] as Map<String, dynamic>?;
       final text = message?['content'] as String?;
       if (text == null || text.trim().isEmpty) return null;
+
+      _logger?.log('MistralProvider.fetchByIsbn', {
+        'isbn': isbn,
+        'systemPrompt': _systemPrompt,
+        'userPrompt': userContent,
+        'rawResponse': text,
+      });
 
       final meta = jsonDecode(text) as Map<String, dynamic>;
       return parseLlmMetadataJson(meta);
