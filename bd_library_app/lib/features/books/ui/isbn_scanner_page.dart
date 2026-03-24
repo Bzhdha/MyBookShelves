@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
+import '../../../db/app_db.dart';
 import '../domain/book_service.dart';
 import '../../settings/data/scan_settings_store.dart';
 import '../../settings/ui/scan_settings_page.dart';
@@ -25,12 +28,27 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
   String? _lastAcceptedIsbn; // anti doublon "validation"
   DateTime? _lastAcceptedAt;
 
+  /// Livre venant d'être ajouté : affiché en bannière en haut quelques secondes.
+  Book? _lastAddedBookForBanner;
+  bool _showAddedBookBanner = false;
+  Timer? _bannerHideTimer;
+
   bool get _isPausedForValidation => _pendingIsbn != null;
+
+  static const Duration _bannerDisplayDuration = Duration(seconds: 4);
 
   @override
   void dispose() {
+    _bannerHideTimer?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _scheduleBannerHide() {
+    _bannerHideTimer?.cancel();
+    _bannerHideTimer = Timer(_bannerDisplayDuration, () {
+      if (mounted) setState(() => _showAddedBookBanner = false);
+    });
   }
 
   // Garde uniquement les chiffres + filtre ISBN/EAN13
@@ -62,8 +80,11 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
     _lastAcceptedAt = DateTime.now();
 
     if (!mounted) return;
+    final book = await bookService.getBook(bookId);
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Ajouté : $isbn')),
+      SnackBar(content: Text('Ajouté : ${book?.title ?? isbn}')),
     );
 
     final scanSettings = context.read<ScanSettingsStore>();
@@ -79,18 +100,39 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
           await bookService.updateBookCoverFromScan(bookId, result.coverPath!);
         }
       } finally {
-        // Toujours réactiver le scan pour enchaîner sur un autre code ISBN
         if (mounted) {
-          setState(() => _pendingIsbn = null);
-          await _controller.start();
+          setState(() {
+            _pendingIsbn = null;
+            _lastAddedBookForBanner = book;
+            _showAddedBookBanner = true;
+          });
+          _scheduleBannerHide();
+          _resumeScannerAfterReturn();
         }
       }
       return;
     }
 
     if (!mounted) return;
-    setState(() => _pendingIsbn = null);
+    setState(() {
+      _pendingIsbn = null;
+      _lastAddedBookForBanner = book;
+      _showAddedBookBanner = true;
+    });
+    _scheduleBannerHide();
     await _controller.start();
+  }
+
+  /// Redémarre le lecteur après un retour de navigation (ex. CoverPhotoPage).
+  /// Reporte le start() au prochain frame + court délai pour que la caméra
+  /// libérée par l'écran précédent soit bien disponible.
+  void _resumeScannerAfterReturn() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await Future.delayed(const Duration(milliseconds: 350));
+      if (!mounted) return;
+      await _controller.start();
+    });
   }
 
   Future<void> _onReject() async {
@@ -146,6 +188,94 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
       ),
       body: Stack(
         children: [
+          // Bannière "livre ajouté" en haut, quelques secondes
+          if (_showAddedBookBanner && _lastAddedBookForBanner != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: Material(
+                    elevation: 8,
+                    borderRadius: BorderRadius.circular(12),
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            color: Theme.of(context).colorScheme.primary,
+                            size: 28,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Référence ajoutée',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelMedium
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onPrimaryContainer
+                                            .withValues(alpha: 0.9),
+                                      ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _lastAddedBookForBanner!.title,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onPrimaryContainer,
+                                      ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (_lastAddedBookForBanner!.authors
+                                        .trim()
+                                        .isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _lastAddedBookForBanner!.authors,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onPrimaryContainer
+                                              .withValues(alpha: 0.85),
+                                        ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           MobileScanner(
             controller: _controller,
             fit: BoxFit.cover,

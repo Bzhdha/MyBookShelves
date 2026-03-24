@@ -68,6 +68,11 @@ class ShelvesPage extends StatelessWidget {
                     return Text('$count livre${count > 1 ? 's' : ''}');
                   },
                 ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.more_vert),
+                  tooltip: 'Modifier ou supprimer l\'étagère',
+                  onPressed: () => _editOrDeleteShelf(context, shelf),
+                ),
                 onTap: () => _openShelfBooks(context, shelf),
                 onLongPress: () => _editOrDeleteShelf(context, shelf),
               );
@@ -171,6 +176,58 @@ class _ShelfBooksPage extends StatelessWidget {
         title: Text(shelf.name),
         backgroundColor: color,
         foregroundColor: Colors.white,
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'Modifier ou supprimer l\'étagère',
+            onSelected: (value) async {
+              if (value == 'edit') {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ShelfEditPage(shelf: shelf),
+                  ),
+                );
+              } else if (value == 'delete') {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('Supprimer l\'étagère ?'),
+                    content: Text(
+                      '« ${shelf.name} » sera supprimée. Les livres ne seront pas supprimés, seulement le classement.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Annuler'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('Supprimer'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true && context.mounted) {
+                  await context.read<ShelfService>().deleteShelf(shelf.id);
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Étagère supprimée')),
+                    );
+                  }
+                }
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'edit', child: Text('Modifier l\'étagère')),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Text('Supprimer l\'étagère', style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        ],
       ),
       body: StreamBuilder<List<Book>>(
         stream: shelfService.watchBooksByShelf(shelf.id),
