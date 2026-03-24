@@ -29,6 +29,9 @@ class _BookDetailPageState extends State<BookDetailPage> {
   String? _backCoverPath;
   Map<String, UserCopyMeta> _copyMetas = {};
   Map<String, String> _userNameById = {};
+  /// Incrémenté à chaque remplacement de photo pour forcer le rechargement (éviter le cache Image.file).
+  int _coverImageVersion = 0;
+  int _backImageVersion = 0;
 
   @override
   void didChangeDependencies() {
@@ -278,11 +281,13 @@ class _BookDetailPageState extends State<BookDetailPage> {
             children: [
               if (hasCover)
                 Expanded(
+                  key: ValueKey('cover_$_coverImageVersion'),
                   child: _coverImage(coverPath),
                 ),
               if (hasCover && hasBack) const SizedBox(width: 12),
               if (hasBack && _backCoverPath != null)
                 Expanded(
+                  key: ValueKey('back_$_backImageVersion'),
                   child: _coverImage(_backCoverPath!, label: 'Dos'),
                 ),
             ],
@@ -306,6 +311,10 @@ class _BookDetailPageState extends State<BookDetailPage> {
     if (isCover && result.coverPath != null) {
       await context.read<BookService>().updateBookCoverFromScan(widget.bookId, result.coverPath!);
     }
+    setState(() {
+      if (isCover) _coverImageVersion++;
+      else _backImageVersion++;
+    });
     await _load();
   }
 

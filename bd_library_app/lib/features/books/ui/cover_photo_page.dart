@@ -234,11 +234,9 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          FittedBox(
-            fit: BoxFit.contain,
-            child: SizedBox(
-              width: _controller!.value.previewSize?.width.toDouble() ?? 1,
-              height: _controller!.value.previewSize?.height.toDouble() ?? 1,
+          Center(
+            child: AspectRatio(
+              aspectRatio: _controller!.value.aspectRatio,
               child: CameraPreview(_controller!),
             ),
           ),
