@@ -24,6 +24,7 @@ dependencies:
   image: ^4.8.0
   http: ^1.2.2
   html: ^0.15.4
+  speech_to_text: ^7.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

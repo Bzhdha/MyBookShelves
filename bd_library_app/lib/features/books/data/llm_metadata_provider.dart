@@ -125,11 +125,18 @@ BdMetadata? parseLlmMetadataJson(Map<String, dynamic> meta) {
 
   if (title == null || title.isEmpty) return null;
 
+  String? description;
+  final desc = meta['description'] ?? meta['summary'];
+  if (desc != null && desc.toString().trim().isNotEmpty) {
+    description = desc.toString().trim();
+  }
+
   return BdMetadata(
     title: title,
     authors: authors,
     publisher: publisher,
     publishedDate: publishedDate,
+    description: description,
     volumeNumber: volumeNumber,
   );
 }

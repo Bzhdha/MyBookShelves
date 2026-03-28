@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/speech_dictation.dart';
 import '../../../db/app_db.dart';
 import '../data/llm_metadata_provider.dart';
 import '../data/metadata_service.dart';
@@ -23,7 +24,11 @@ class _EditBookPageState extends State<EditBookPage> {
   late final TextEditingController _publisherCtrl;
   late final TextEditingController _publishedDateCtrl;
   late final TextEditingController _volumeNumberCtrl;
+  late final TextEditingController _summaryCtrl;
   late final TextEditingController _promptCtrl;
+
+  final _speechSummary = SpeechDictation();
+  bool _summaryListening = false;
 
   bool _searchLoading = false;
   LlmPromptResult? _lastSearchResult;
@@ -41,11 +46,13 @@ class _EditBookPageState extends State<EditBookPage> {
     _volumeNumberCtrl = TextEditingController(
       text: b.volumeNumber != null ? b.volumeNumber.toString() : '',
     );
+    _summaryCtrl = TextEditingController(text: b.summary);
     final defaultPrompt = llmIsbnSearchUserPromptTemplate.replaceAll(
       '[INSÉRER_ISBN_ICI]',
       b.isbn?.trim().isNotEmpty == true ? b.isbn!.trim() : '',
     );
     _promptCtrl = TextEditingController(text: defaultPrompt);
+    _speechSummary.initialize();
   }
 
   @override
@@ -56,8 +63,42 @@ class _EditBookPageState extends State<EditBookPage> {
     _publisherCtrl.dispose();
     _publishedDateCtrl.dispose();
     _volumeNumberCtrl.dispose();
+    _summaryCtrl.dispose();
     _promptCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _toggleSummaryVoice() async {
+    if (_summaryListening) {
+      await _speechSummary.stop();
+      if (mounted) setState(() => _summaryListening = false);
+      return;
+    }
+    final ok = await _speechSummary.initialize();
+    if (!ok) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Reconnaissance vocale indisponible (micro ou permissions).',
+          ),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _summaryListening = true);
+    final base = _summaryCtrl.text;
+    await _speechSummary.startListening(
+      baseText: base,
+      onText: (text) {
+        _summaryCtrl.text = text;
+        _summaryCtrl.selection = TextSelection.collapsed(
+          offset: _summaryCtrl.text.length,
+        );
+      },
+    );
+    if (mounted) setState(() => _summaryListening = false);
   }
 
   Future<void> _runSearch() async {
@@ -112,6 +153,9 @@ class _EditBookPageState extends State<EditBookPage> {
     if (meta.volumeNumber != null && meta.volumeNumber!.trim().isNotEmpty) {
       _volumeNumberCtrl.text = meta.volumeNumber!.trim();
     }
+    if (meta.description != null && meta.description!.trim().isNotEmpty) {
+      _summaryCtrl.text = meta.description!.trim();
+    }
   }
 
   Future<void> _save() async {
@@ -136,6 +180,7 @@ class _EditBookPageState extends State<EditBookPage> {
       publisher: _publisherCtrl.text.trim().isEmpty ? null : _publisherCtrl.text.trim(),
       publishedDate: _publishedDateCtrl.text.trim().isEmpty ? null : _publishedDateCtrl.text.trim(),
       volumeNumber: volumeNumber,
+      summary: _summaryCtrl.text.trim(),
     );
     if (!mounted) return;
     Navigator.pop(context, true);
@@ -204,6 +249,28 @@ class _EditBookPageState extends State<EditBookPage> {
               border: OutlineInputBorder(),
             ),
             keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _summaryCtrl,
+            decoration: InputDecoration(
+              labelText: 'Résumé',
+              hintText: 'Synopsis ou notes sur l\'histoire…',
+              border: const OutlineInputBorder(),
+              alignLabelWithHint: true,
+              suffixIcon: IconButton(
+                tooltip: _summaryListening ? 'Arrêter la dictée' : 'Dictée vocale',
+                icon: Icon(
+                  _summaryListening ? Icons.mic : Icons.mic_none_outlined,
+                  color: _summaryListening
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+                onPressed: _toggleSummaryVoice,
+              ),
+            ),
+            minLines: 3,
+            maxLines: 8,
           ),
           const SizedBox(height: 24),
           const Divider(height: 1),

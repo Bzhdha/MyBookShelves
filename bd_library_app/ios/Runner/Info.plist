@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Le micro permet la recherche et la saisie de résumés à la voix dans la bibliothèque.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>La reconnaissance vocale permet de rechercher des livres et de dicter des résumés.</string>
 </dict>
 </plist>

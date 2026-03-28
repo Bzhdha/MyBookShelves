@@ -57,6 +57,7 @@ class FamilyTransferService {
                 publishedDate: b.publishedDate,
                 coverUrl: b.coverUrl,
                 tags: b.tags,
+                summary: b.summary,
                 updatedAt: b.updatedAt,
               ))
           .toList(),

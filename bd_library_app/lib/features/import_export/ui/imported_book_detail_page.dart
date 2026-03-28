@@ -33,6 +33,17 @@ class ImportedBookDetailPage extends StatelessWidget {
           if (book.volumeNumber != null) Text('Tome: ${book.volumeNumber}'),
           if (book.publisher != null) Text('Éditeur: ${book.publisher}'),
           if (book.publishedDate != null) Text('Date: ${book.publishedDate}'),
+          if (book.summary.trim().isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Résumé',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            SelectableText(book.summary),
+          ],
           const Divider(height: 32),
           Text(
             'Exemplaires (${copies.length})',

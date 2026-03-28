@@ -105,6 +105,7 @@ class LibraryTransferService {
                 publishedDate: b.publishedDate,
                 coverUrl: b.coverUrl,
                 tags: b.tags,
+                summary: b.summary,
                 updatedAt: b.updatedAt,
               ))
           .toList(),
@@ -190,6 +191,7 @@ class LibraryTransferService {
                 publishedDate: b.publishedDate,
                 coverUrl: b.coverUrl,
                 tags: b.tags,
+                summary: b.summary,
                 updatedAt: b.updatedAt,
               ))
           .toList(),
@@ -407,6 +409,7 @@ class LibraryTransferService {
         coverUrl: Value(b.coverUrl),
         coverLocalPath: Value(null),
         tags: Value(b.tags),
+        summary: Value(b.summary),
         updatedAt: b.updatedAt,
       ));
     }
@@ -431,6 +434,7 @@ class LibraryTransferService {
           publishedDate: Value(imp.publishedDate),
           coverUrl: Value(imp.coverUrl),
           tags: Value(imp.tags),
+          summary: Value(imp.summary),
           updatedAt: Value(imp.updatedAt),
         ));
       }
@@ -459,6 +463,7 @@ class LibraryTransferService {
             publishedDate: Value(c.imported.publishedDate),
             coverUrl: Value(c.imported.coverUrl),
             tags: Value(c.imported.tags),
+            summary: Value(c.imported.summary),
             updatedAt: Value(c.imported.updatedAt),
           ));
           break;
@@ -476,6 +481,7 @@ class LibraryTransferService {
             publishedDate: Value(merged.publishedDate),
             coverUrl: Value(merged.coverUrl),
             tags: Value(merged.tags),
+            summary: Value(merged.summary),
             // on met "now" pour dire "résolu"
             updatedAt: Value(DateTime.now()),
           ));
@@ -523,6 +529,7 @@ class LibraryTransferService {
         coverUrl: Value(b.coverUrl),
         coverLocalPath: Value(null),
         tags: Value(b.tags),
+        summary: Value(b.summary),
         updatedAt: b.updatedAt,
       ));
     }
@@ -546,6 +553,7 @@ class LibraryTransferService {
           publishedDate: Value(imp.publishedDate),
           coverUrl: Value(imp.coverUrl),
           tags: Value(imp.tags),
+          summary: Value(imp.summary),
           updatedAt: Value(imp.updatedAt),
         ));
       }
@@ -572,6 +580,7 @@ class LibraryTransferService {
             publishedDate: Value(c.imported.publishedDate),
             coverUrl: Value(c.imported.coverUrl),
             tags: Value(c.imported.tags),
+            summary: Value(c.imported.summary),
             updatedAt: Value(c.imported.updatedAt),
           ));
           break;
@@ -588,6 +597,7 @@ class LibraryTransferService {
             publishedDate: Value(merged.publishedDate),
             coverUrl: Value(merged.coverUrl),
             tags: Value(merged.tags),
+            summary: Value(merged.summary),
             updatedAt: Value(DateTime.now()),
           ));
           break;
@@ -703,6 +713,7 @@ class LibraryTransferService {
     if ((local.volumeNumber ?? -1) != (imp.volumeNumber ?? -1)) return true;
     if ((local.coverUrl ?? '') != (imp.coverUrl ?? '')) return true;
     if ((local.tags) != imp.tags) return true;
+    if (local.summary != imp.summary) return true;
     return false;
   }
 
@@ -741,6 +752,7 @@ class LibraryTransferService {
       publishedDate: pickN(local.publishedDate, imp.publishedDate),
       coverUrl: pickN(local.coverUrl, imp.coverUrl),
       tags: mergedTags,
+      summary: pick(local.summary, imp.summary),
       updatedAt: DateTime.now(),
     );
   }

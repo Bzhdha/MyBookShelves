@@ -1,0 +1,224 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../db/app_db.dart';
+import '../data/reading_repository.dart';
+import '../domain/reading_session_store.dart';
+import '../../books/ui/book_detail_page.dart';
+
+class StartReadingSessionPage extends StatefulWidget {
+  const StartReadingSessionPage({super.key});
+
+  @override
+  State<StartReadingSessionPage> createState() =>
+      _StartReadingSessionPageState();
+}
+
+class _StartReadingSessionPageState extends State<StartReadingSessionPage> {
+  final _isbnCtrl = TextEditingController();
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchCtrl.addListener(() {
+      setState(() => _searchQuery = _searchCtrl.text.trim());
+    });
+  }
+
+  @override
+  void dispose() {
+    _isbnCtrl.dispose();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onIsbnLookup() async {
+    final raw = _isbnCtrl.text.replaceAll(RegExp(r'[^0-9Xx]'), '');
+    if (raw.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saisissez un ISBN ou EAN')),
+      );
+      return;
+    }
+    final repo = context.read<ReadingRepository>();
+    var list = await repo.findByIsbn(raw);
+    if (list.isEmpty && raw.length >= 10) {
+      list = await repo.searchBooks(raw);
+    }
+    if (!mounted) return;
+    if (list.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Aucun livre avec cet ISBN')),
+      );
+      return;
+    }
+    if (list.length == 1) {
+      await _pickBook(list.first);
+      return;
+    }
+    await _showBookPicker(list);
+  }
+
+  Future<void> _showBookPicker(List<Book> books) async {
+    final chosen = await showDialog<Book>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Plusieurs livres correspondent'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: books
+                .map(
+                  (b) => ListTile(
+                    title: Text(b.title.isEmpty ? 'Sans titre' : b.title),
+                    subtitle: b.authors.trim().isNotEmpty
+                        ? Text(b.authors)
+                        : null,
+                    onTap: () => Navigator.pop(ctx, b),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+      ),
+    );
+    if (chosen != null && mounted) await _pickBook(chosen);
+  }
+
+  Future<void> _pickBook(Book b) async {
+    final store = context.read<ReadingSessionStore>();
+    final repo = context.read<ReadingRepository>();
+    final progressBefore = await repo.getOrCreateProgress(b.id);
+
+    var result = await store.startOrResumeSession(b.id);
+    if (!mounted) return;
+
+    if (result == StartSessionResult.conflictOtherBook) {
+      final other = store.activeBook?.title ?? 'un autre livre';
+      final go = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Séance en cours'),
+          content: Text(
+            'Une séance est déjà ouverte sur « $other ». '
+            'Terminer cette séance pour en démarrer une nouvelle sur ce livre ?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Terminer l’ancienne'),
+            ),
+          ],
+        ),
+      );
+      if (go != true || !mounted) return;
+      await store.abandonActiveSessionForSwitch();
+      result = await store.startOrResumeSession(b.id);
+      if (!mounted) return;
+    }
+
+    final p = await repo.getOrCreateProgress(b.id);
+    final msg = result == StartSessionResult.resumedSameBook
+        ? 'Reprise — page ${p.currentPage}'
+        : 'Séance démarrée — reprise page ${progressBefore.currentPage}';
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final repo = context.read<ReadingRepository>();
+    return Scaffold(
+      appBar: AppBar(title: const Text('Démarrer une séance')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text(
+            'Identifiez un livre par ISBN ou par la recherche. '
+            'La séance reprend à la page enregistrée dans la progression. '
+            'Vous pouvez quitter l’app pendant la lecture ; au retour, '
+            'indiquez la fin de séance depuis l’accueil ou le menu.',
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _isbnCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'ISBN / EAN',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: _onIsbnLookup,
+                child: const Text('Chercher'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          TextField(
+            controller: _searchCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Recherche (titre, auteur…)',
+              prefixIcon: Icon(Icons.search),
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          FutureBuilder<List<Book>>(
+            future: _searchQuery.isEmpty
+                ? Future.value([])
+                : repo.searchBooks(_searchQuery),
+            builder: (context, snap) {
+              if (_searchQuery.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              if (!snap.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final books = snap.data!;
+              if (books.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('Aucun résultat'),
+                );
+              }
+              return Column(
+                children: books.map((b) {
+                  return ListTile(
+                    leading: const Icon(Icons.menu_book_outlined),
+                    title: Text(b.title.isEmpty ? 'Sans titre' : b.title),
+                    subtitle: b.authors.trim().isNotEmpty
+                        ? Text(b.authors)
+                        : null,
+                    onTap: () => _pickBook(b),
+                    onLongPress: () => Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => BookDetailPage(bookId: b.id),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
