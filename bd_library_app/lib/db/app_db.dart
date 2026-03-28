@@ -49,6 +49,9 @@ class Books extends Table {
   /// Tags perso (CSV) : "SF, Aventure, Humour"
   TextColumn get tags => text().withDefault(const Constant(''))();
 
+  /// Résumé / synopsis (saisi à la main ou issu d'une recherche IA).
+  TextColumn get summary => text().withDefault(const Constant(''))();
+
   DateTimeColumn get updatedAt => dateTime()();
 
   @override
@@ -101,18 +104,72 @@ class Copies extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Progression de lecture par livre (œuvre).
+@DataClassName('ReadingProgressRow')
+class ReadingProgress extends Table {
+  TextColumn get bookId => text()();
+  /// 0 = à lire, 1 = en cours, 2 = terminé
+  IntColumn get status => integer().withDefault(const Constant(0))();
+  IntColumn get currentPage => integer().withDefault(const Constant(0))();
+  IntColumn get totalPages => integer().nullable()();
+  BoolColumn get usePercentage =>
+      boolean().withDefault(const Constant(false))();
+  IntColumn get progressPercent => integer().nullable()();
+  DateTimeColumn get readingStartedAt => dateTime().nullable()();
+  DateTimeColumn get readingFinishedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {bookId};
+}
+
+@DataClassName('ReadingSession')
+class ReadingSessions extends Table {
+  TextColumn get id => text()();
+  TextColumn get bookId => text()();
+  DateTimeColumn get startedAt => dateTime()();
+  DateTimeColumn get endedAt => dateTime().nullable()();
+  IntColumn get startPage => integer().withDefault(const Constant(0))();
+  IntColumn get endPage => integer().nullable()();
+  IntColumn get durationSeconds => integer().nullable()();
+  BoolColumn get finishedBook => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('ReadingGoalsRow')
+class ReadingGoals extends Table {
+  TextColumn get id => text()();
+  IntColumn get booksPerMonth => integer().nullable()();
+  IntColumn get booksPerYear => integer().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// --------------------
 /// DB
 /// --------------------
-@DriftDatabase(tables: [Books, Series, Copies, Shelves, BookShelf, Users, UserCopyMetas])
+@DriftDatabase(tables: [
+  Books,
+  Series,
+  Copies,
+  Shelves,
+  BookShelf,
+  Users,
+  UserCopyMetas,
+  ReadingProgress,
+  ReadingSessions,
+  ReadingGoals,
+])
 class AppDb extends _$AppDb {
   AppDb() : super(_openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 5;
 
-  /// Migration strategy (v1 -> v2 -> v3)
-  /// v2: Copies. v3: Shelves + BookShelf (étagères thématiques).
+  /// Migration strategy (v1 -> … -> v5)
+  /// v2: Copies. v3: Shelves + BookShelf. v4: Books.summary. v5: suivi lecture.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
@@ -125,6 +182,17 @@ class AppDb extends _$AppDb {
           if (from < 3) {
             await m.createTable(shelves);
             await m.createTable(bookShelf);
+          }
+          if (from < 4) {
+            await m.addColumn(books, books.summary);
+          }
+          if (from < 5) {
+            await m.createTable(readingProgress);
+            await m.createTable(readingSessions);
+            await m.createTable(readingGoals);
+            await into(readingGoals).insert(
+              ReadingGoalsCompanion.insert(id: 'default'),
+            );
           }
         },
       );
@@ -158,7 +226,8 @@ class AppDb extends _$AppDb {
       into(books).insertOnConflictUpdate(b);
 
   Future<void> deleteBookById(String id) async {
-    // supprimer d'abord les copies
+    await (delete(readingSessions)..where((s) => s.bookId.equals(id))).go();
+    await (delete(readingProgress)..where((p) => p.bookId.equals(id))).go();
     await (delete(copies)..where((c) => c.bookId.equals(id))).go();
     await (delete(books)..where((t) => t.id.equals(id))).go();
   }
@@ -176,6 +245,7 @@ class AppDb extends _$AppDb {
           ..where((t) =>
               t.title.like(pattern) |
               t.authors.like(pattern) |
+              t.summary.like(pattern) |
               (t.isbn.isNotNull() & t.isbn.like(pattern)))
           ..orderBy([(t) => OrderingTerm.asc(t.title)]))
         .get();
@@ -336,6 +406,109 @@ class AppDb extends _$AppDb {
       )).toList();
     }
   }
+
+  /// --------------------
+  /// Suivi de lecture
+  /// --------------------
+  Future<ReadingProgressRow?> readingProgressForBook(String bookId) =>
+      (select(readingProgress)..where((t) => t.bookId.equals(bookId)))
+          .getSingleOrNull();
+
+  Future<ReadingProgressRow> getOrCreateReadingProgress(String bookId) async {
+    final existing = await readingProgressForBook(bookId);
+    if (existing != null) return existing;
+    await into(readingProgress).insert(
+      ReadingProgressCompanion.insert(
+        bookId: bookId,
+      ),
+    );
+    return (await readingProgressForBook(bookId))!;
+  }
+
+  Future<void> upsertReadingProgress(ReadingProgressCompanion c) =>
+      into(readingProgress).insertOnConflictUpdate(c);
+
+  Stream<List<ReadingProgressRow>> watchReadingProgress() =>
+      select(readingProgress).watch();
+
+  Future<List<ReadingProgressRow>> allReadingProgressRows() =>
+      select(readingProgress).get();
+
+  Future<ReadingSession?> getActiveReadingSession() async {
+    final rows = await (select(readingSessions)
+          ..where((t) => t.endedAt.isNull())
+          ..limit(1))
+        .get();
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  Future<void> insertReadingSession(ReadingSessionsCompanion row) =>
+      into(readingSessions).insert(row);
+
+  Future<void> updateReadingSession(
+    String id,
+    ReadingSessionsCompanion patch,
+  ) async {
+    await (update(readingSessions)..where((t) => t.id.equals(id)))
+        .write(patch);
+  }
+
+  Future<List<ReadingSession>> completedReadingSessions({
+    int limit = 500,
+  }) =>
+      (select(readingSessions)
+            ..where((t) => t.endedAt.isNotNull())
+            ..orderBy([(t) => OrderingTerm.desc(t.endedAt)])
+            ..limit(limit))
+          .get();
+
+  Future<int> totalCompletedReadingSeconds() async {
+    final sessions = await (select(readingSessions)
+          ..where((t) => t.endedAt.isNotNull()))
+        .get();
+    var total = 0;
+    for (final s in sessions) {
+      total += s.durationSeconds ?? 0;
+    }
+    return total;
+  }
+
+  Future<ReadingGoalsRow?> readingGoalsRow() =>
+      (select(readingGoals)..where((t) => t.id.equals('default')))
+          .getSingleOrNull();
+
+  Future<ReadingGoalsRow> getOrCreateReadingGoals() async {
+    final g = await readingGoalsRow();
+    if (g != null) return g;
+    await into(readingGoals).insert(
+      ReadingGoalsCompanion.insert(id: 'default'),
+    );
+    return (await readingGoalsRow())!;
+  }
+
+  Future<void> upsertReadingGoals(ReadingGoalsCompanion g) =>
+      into(readingGoals).insertOnConflictUpdate(g);
+
+  /// Livres terminés (sessions avec [finishedBook]) dans l’intervalle [from, to].
+  Future<int> countFinishedBooksBetween(DateTime from, DateTime to) async {
+    final rows = await (select(readingSessions)
+          ..where(
+            (t) =>
+                t.endedAt.isNotNull() &
+                t.finishedBook.equals(true) &
+                t.endedAt.isBiggerOrEqualValue(from) &
+                t.endedAt.isSmallerOrEqualValue(to),
+          ))
+        .get();
+    return rows.length;
+  }
+}
+
+/// Constantes statut de lecture (alignées sur [ReadingProgress.status]).
+abstract class ReadingStatusValues {
+  static const int toRead = 0;
+  static const int inProgress = 1;
+  static const int finished = 2;
 }
 
 LazyDatabase _openConnection() {

@@ -125,6 +125,10 @@ class BookService {
         coverUrl: coverUrl,
       );
 
+      final summaryText = meta?.description?.trim().isNotEmpty == true
+          ? meta!.description!.trim()
+          : '';
+
       await _repo.upsertBook(
         BooksCompanion.insert(
           id: newBookId,
@@ -136,6 +140,7 @@ class BookService {
           coverUrl: Value(coverUrl),
           coverLocalPath: Value(coverLocalPath),
           volumeNumber: Value(volumeNumber),
+          summary: Value(summaryText),
           updatedAt: DateTime.now(),
         ),
       );
@@ -187,6 +192,12 @@ class BookService {
             );
           }
 
+          final newSummary = existing.summary.trim().isNotEmpty
+              ? existing.summary
+              : (meta.description?.trim().isNotEmpty == true
+                  ? meta.description!.trim()
+                  : existing.summary);
+
           await _repo.upsertBook(
             BooksCompanion(
               id: Value(bookId),
@@ -206,6 +217,7 @@ class BookService {
               coverUrl: Value(newCoverUrl),
               coverLocalPath: Value(newCoverLocalPath),
               volumeNumber: Value(newVolumeNumber),
+              summary: Value(newSummary),
               updatedAt: Value(DateTime.now()),
             ),
           );
@@ -241,6 +253,7 @@ class BookService {
     String? publisher,
     String? publishedDate,
     int? volumeNumber,
+    String? summary,
   }) async {
     _logger?.log('BookService.updateBookDetails', {'id': id});
     final existing = await _repo.getBookById(id);
@@ -258,6 +271,7 @@ class BookService {
         coverUrl: Value(existing.coverUrl),
         coverLocalPath: Value(existing.coverLocalPath),
         tags: Value(existing.tags),
+        summary: Value(summary ?? existing.summary),
         updatedAt: Value(DateTime.now()),
       ),
     );

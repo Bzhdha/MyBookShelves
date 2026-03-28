@@ -149,6 +149,9 @@ class _MetadataSearchSheetState extends State<MetadataSearchSheet> {
       publisher: meta.publisher?.trim().isEmpty == true ? null : meta.publisher?.trim(),
       publishedDate: meta.publishedDate?.trim().isEmpty == true ? null : meta.publishedDate?.trim(),
       volumeNumber: volumeNumber,
+      summary: (meta.description?.trim().isNotEmpty == true)
+          ? meta.description!.trim()
+          : null,
     );
     if (!mounted) return;
     Navigator.pop(context, true);

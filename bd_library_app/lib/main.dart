@@ -31,8 +31,18 @@ import 'features/shelves/data/shelves_repository.dart';
 import 'features/shelves/domain/shelf_service.dart';
 import 'features/shelves/ui/shelves_page.dart';
 import 'core/app_logger.dart';
+import 'core/speech_dictation.dart';
 import 'features/logs/ui/logs_page.dart';
 import 'features/settings/ui/scan_settings_page.dart';
+import 'features/reading/data/reading_repository.dart';
+import 'features/reading/domain/reading_session_store.dart';
+import 'features/reading/ui/reading_active_banner.dart';
+import 'features/reading/ui/reading_status_page.dart';
+import 'features/reading/ui/reading_progress_page.dart';
+import 'features/reading/ui/reading_goals_page.dart';
+import 'features/reading/ui/reading_history_page.dart';
+import 'features/reading/ui/reading_stats_page.dart';
+import 'features/reading/ui/start_reading_session_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,6 +73,7 @@ Future<void> main() async {
     coverCacheService,
     appLogger,
   );
+  final readingRepository = ReadingRepository(db);
 
   runApp(
     MultiProvider(
@@ -78,6 +89,11 @@ Future<void> main() async {
         Provider<ImportedLibraryStore>.value(value: ImportedLibraryStore()),
         ChangeNotifierProvider(create: (_) => ActiveUserStore()..load()),
         ChangeNotifierProvider<AppLogger>.value(value: appLogger),
+        Provider<ReadingRepository>.value(value: readingRepository),
+        ChangeNotifierProvider<ReadingSessionStore>(
+          create: (context) =>
+              ReadingSessionStore(context.read<ReadingRepository>())..load(),
+        ),
       ],
       child: const MyApp(),
     ),
@@ -104,22 +120,69 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  final _speechSearch = SpeechDictation();
+  bool _searchListening = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.trim());
+    });
+    _speechSearch.initialize();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<ReadingSessionStore>().load();
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      context.read<ReadingSessionStore>().load();
+    }
+  }
+
+  Future<void> _toggleVoiceSearch() async {
+    if (_searchListening) {
+      await _speechSearch.stop();
+      if (mounted) setState(() => _searchListening = false);
+      return;
+    }
+    final ok = await _speechSearch.initialize();
+    if (!ok) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Reconnaissance vocale indisponible (micro ou permissions).',
+          ),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _searchListening = true);
+    await _speechSearch.startListening(
+      baseText: '',
+      onText: (text) {
+        _searchController.text = text;
+        _searchController.selection = TextSelection.collapsed(
+          offset: _searchController.text.length,
+        );
+      },
+    );
+    if (mounted) setState(() => _searchListening = false);
   }
 
   @override
@@ -253,6 +316,91 @@ class _HomePageState extends State<HomePage> {
                 );
               },
             ),
+            ExpansionTile(
+              leading: const Icon(Icons.auto_stories),
+              title: const Text('Suivi de lecture'),
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.play_circle_outline),
+                  title: const Text('Débuter une séance'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.read<AppLogger>().log('Débuter séance lecture');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const StartReadingSessionPage(),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.label_outline),
+                  title: const Text('Statuts de lecture'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ReadingStatusPage(),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.linear_scale),
+                  title: const Text('Progression'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ReadingProgressPage(),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.flag_outlined),
+                  title: const Text('Objectifs'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ReadingGoalsPage(),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.history),
+                  title: const Text('Historique'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ReadingHistoryPage(),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.bar_chart_outlined),
+                  title: const Text('Statistiques'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ReadingStatsPage(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
             ListTile(
               leading: const Icon(Icons.key),
               title: const Text('Clés API (recherche LLM)'),
@@ -295,19 +443,37 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Column(
         children: [
+          const ReadingActiveBanner(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Rechercher (auteur, titre ou ISBN)…',
+                hintText:
+                    'Rechercher (auteur, titre, ISBN, résumé) — icône micro pour la voix',
                 prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: _searchListening
+                          ? 'Arrêter la dictée'
+                          : 'Recherche vocale',
+                      icon: Icon(
+                        _searchListening ? Icons.mic : Icons.mic_none_outlined,
+                        color: _searchListening
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                      ),
+                      onPressed: _toggleVoiceSearch,
+                    ),
+                    if (_searchQuery.isNotEmpty)
+                      IconButton(
                         icon: const Icon(Icons.clear),
                         onPressed: () => _searchController.clear(),
-                      )
-                    : null,
+                      ),
+                  ],
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),

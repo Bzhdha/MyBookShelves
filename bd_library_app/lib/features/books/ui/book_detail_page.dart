@@ -154,6 +154,20 @@ class _BookDetailPageState extends State<BookDetailPage> {
           Text('ISBN: ${book!.isbn ?? "-"}'),
           Text('Auteurs: ${book!.authors}'),
           Text('Tome: ${book!.volumeNumber ?? "-"}'),
+          if (book!.summary.trim().isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Résumé',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            SelectableText(
+              book!.summary,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ],
           const Divider(height: 32),
           _buildShelvesSection(context),
           const Divider(height: 32),
