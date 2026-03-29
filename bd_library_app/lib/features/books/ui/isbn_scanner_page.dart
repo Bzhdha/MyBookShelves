@@ -11,7 +11,13 @@ import '../../settings/ui/scan_settings_page.dart';
 import 'cover_photo_page.dart';
 
 class IsbnScannerPage extends StatefulWidget {
-  const IsbnScannerPage({super.key});
+  const IsbnScannerPage({
+    super.key,
+    this.lookupOnly = false,
+  });
+
+  /// Si vrai, renvoie l'ISBN/EAN normalisé via [Navigator.pop] sans créer ni enrichir de fiche.
+  final bool lookupOnly;
 
   @override
   State<IsbnScannerPage> createState() => _IsbnScannerPageState();
@@ -74,6 +80,14 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
   }
 
   Future<void> _onValidate(BookService bookService, String isbn) async {
+    if (widget.lookupOnly) {
+      _lastAcceptedIsbn = isbn;
+      _lastAcceptedAt = DateTime.now();
+      if (!mounted) return;
+      Navigator.pop<String>(context, isbn);
+      return;
+    }
+
     final bookId = await bookService.addOrUpdateFromIsbnScan(isbn);
 
     _lastAcceptedIsbn = isbn;
@@ -154,18 +168,21 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scan ISBN (enchaîné)'),
+        title: Text(
+          widget.lookupOnly ? 'Scanner un ISBN / EAN' : 'Scan ISBN (enchaîné)',
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ScanSettingsPage()),
-              );
-            },
-            tooltip: 'Paramètres scan (photo couverture/dos)',
-          ),
+          if (!widget.lookupOnly)
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ScanSettingsPage()),
+                );
+              },
+              tooltip: 'Paramètres scan (photo couverture/dos)',
+            ),
           IconButton(
             icon: ValueListenableBuilder<MobileScannerState>(
               valueListenable: _controller,
@@ -339,9 +356,11 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
                                 style: const TextStyle(fontSize: 16),
                               ),
                               const SizedBox(height: 4),
-                              const Text(
-                                'Valider pour ajouter et passer à la BD suivante',
-                                style: TextStyle(fontSize: 12),
+                              Text(
+                                widget.lookupOnly
+                                    ? 'Valider pour utiliser ce code'
+                                    : 'Valider pour ajouter et passer à la BD suivante',
+                                style: const TextStyle(fontSize: 12),
                               ),
                             ],
                           ),
