@@ -5,6 +5,7 @@ import '../../../db/app_db.dart';
 import '../data/reading_repository.dart';
 import '../domain/reading_session_store.dart';
 import '../../books/ui/book_detail_page.dart';
+import '../../books/ui/isbn_scanner_page.dart';
 
 class StartReadingSessionPage extends StatefulWidget {
   const StartReadingSessionPage({super.key});
@@ -32,6 +33,29 @@ class _StartReadingSessionPageState extends State<StartReadingSessionPage> {
     _isbnCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _scanIsbnField() async {
+    final isbn = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const IsbnScannerPage(lookupOnly: true),
+      ),
+    );
+    if (!mounted || isbn == null) return;
+    _isbnCtrl.text = isbn;
+    await _onIsbnLookup();
+  }
+
+  Future<void> _scanSearchField() async {
+    final code = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const IsbnScannerPage(lookupOnly: true),
+      ),
+    );
+    if (!mounted || code == null) return;
+    _searchCtrl.text = code;
   }
 
   Future<void> _onIsbnLookup() async {
@@ -156,9 +180,14 @@ class _StartReadingSessionPageState extends State<StartReadingSessionPage> {
                 child: TextField(
                   controller: _isbnCtrl,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'ISBN / EAN',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      tooltip: 'Scanner le code-barres',
+                      icon: const Icon(Icons.qr_code_scanner),
+                      onPressed: _scanIsbnField,
+                    ),
                   ),
                 ),
               ),
@@ -172,10 +201,16 @@ class _StartReadingSessionPageState extends State<StartReadingSessionPage> {
           const SizedBox(height: 24),
           TextField(
             controller: _searchCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Recherche (titre, auteur…)',
-              prefixIcon: Icon(Icons.search),
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: 'Recherche (titre, auteur, ISBN…)',
+              prefixIcon: const Icon(Icons.search),
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                tooltip:
+                    'Scanner un code-barres (ISBN / EAN) pour lancer la recherche',
+                icon: const Icon(Icons.qr_code_scanner),
+                onPressed: _scanSearchField,
+              ),
             ),
           ),
           const SizedBox(height: 8),

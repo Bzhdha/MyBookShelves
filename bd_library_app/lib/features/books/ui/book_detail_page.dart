@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -9,6 +10,7 @@ import '../domain/book_service.dart';
 import '../../shelves/domain/shelf_service.dart';
 import '../../users/domain/active_user_store.dart';
 import 'copy_form_page.dart';
+import 'cover_ocr_zones_page.dart';
 import 'cover_photo_page.dart';
 import 'edit_book_page.dart';
 import 'metadata_search_sheet.dart';
@@ -153,6 +155,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
           const SizedBox(height: 16),
           Text('ISBN: ${book!.isbn ?? "-"}'),
           Text('Auteurs: ${book!.authors}'),
+          Text('Éditeur: ${book!.publisher?.trim().isNotEmpty == true ? book!.publisher! : "-"}'),
           Text('Tome: ${book!.volumeNumber ?? "-"}'),
           if (book!.summary.trim().isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -278,6 +281,19 @@ class _BookDetailPageState extends State<BookDetailPage> {
                 label: const Text('Inverser couverture et dos'),
                 onPressed: () => _swapCoverAndBack(context),
               ),
+            if (coverOcrSupportedPlatform()) ...[
+              if (hasCover)
+                TextButton.icon(
+                  icon: const Icon(Icons.document_scanner_outlined, size: 18),
+                  label: const Text('Reconnaître texte (couverture)'),
+                  onPressed: () => _openCoverOcr(context, coverPath),
+                ),
+              TextButton.icon(
+                icon: const Icon(Icons.image_search, size: 18),
+                label: const Text('Reconnaître texte (autre image)'),
+                onPressed: () => _pickImageForCoverOcr(context),
+              ),
+            ],
           ],
         ),
         if (!hasCover && !hasBack)
@@ -309,6 +325,27 @@ class _BookDetailPageState extends State<BookDetailPage> {
         ],
       ],
     );
+  }
+
+  Future<void> _openCoverOcr(BuildContext context, String imagePath) async {
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CoverOcrZonesPage(
+          imagePath: imagePath,
+          bookId: widget.bookId,
+        ),
+      ),
+    );
+    if (mounted) await _load();
+  }
+
+  Future<void> _pickImageForCoverOcr(BuildContext context) async {
+    final r = await FilePicker.platform.pickFiles(type: FileType.image);
+    if (!mounted) return;
+    final path = r?.files.single.path;
+    if (path == null) return;
+    await _openCoverOcr(context, path);
   }
 
   Future<void> _replaceCoverOrBack(BuildContext context, {required bool isCover}) async {

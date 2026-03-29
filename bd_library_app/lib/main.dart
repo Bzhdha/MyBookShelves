@@ -488,15 +488,37 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          context.read<AppLogger>().log('Ouvrir scan ISBN');
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const IsbnScannerPage()),
-          );
-        },
-        child: const Icon(Icons.qr_code_scanner),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.small(
+            heroTag: 'fab_start_reading',
+            tooltip: 'Démarrer une séance de lecture',
+            onPressed: () {
+              context.read<AppLogger>().log('Débuter séance lecture (accueil)');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const StartReadingSessionPage(),
+                ),
+              );
+            },
+            child: const Icon(Icons.auto_stories),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton(
+            heroTag: 'fab_isbn_scan',
+            onPressed: () {
+              context.read<AppLogger>().log('Ouvrir scan ISBN');
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const IsbnScannerPage()),
+              );
+            },
+            child: const Icon(Icons.qr_code_scanner),
+          ),
+        ],
       ),
     );
   }
