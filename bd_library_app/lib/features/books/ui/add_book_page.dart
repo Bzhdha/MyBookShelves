@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/isbn_validator.dart';
 import '../domain/book_service.dart';
 import '../data/metadata_service.dart';
 
@@ -24,10 +25,21 @@ class _AddBookPageState extends State<AddBookPage> {
     final raw = _isbnCtrl.text.trim();
     if (raw.isEmpty) return;
 
+    final normalized = IsbnValidator.normalize(raw);
+    final validationError = IsbnValidator.validate(raw);
+    if (validationError != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('ISBN invalide : $validationError')),
+        );
+      }
+      return;
+    }
+
     setState(() => _loadingIsbn = true);
     try {
       final metadataService = context.read<MetadataService>();
-      final meta = await metadataService.enrichFromIsbn(raw);
+      final meta = await metadataService.enrichFromIsbn(normalized);
 
       if (meta != null) {
         // Ne pas écraser si l'utilisateur a déjà saisi

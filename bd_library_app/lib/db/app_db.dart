@@ -354,6 +354,11 @@ class AppDb extends _$AppDb {
   Future<List<User>> getAllUsers() =>
       (select(users)..orderBy([(t) => OrderingTerm.asc(t.displayName)])).get();
 
+  Future<void> deleteUserById(String id) async {
+    await (delete(userCopyMetas)..where((t) => t.userId.equals(id))).go();
+    await (delete(users)..where((t) => t.id.equals(id))).go();
+  }
+
   /// --------------------
   /// Series incomplete (Mode A)
   /// --------------------

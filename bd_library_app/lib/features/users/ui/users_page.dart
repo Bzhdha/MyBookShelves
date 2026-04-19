@@ -49,7 +49,17 @@ class _UsersPageState extends State<UsersPage> {
           ...users.map((u) => ListTile(
                 title: Text(u.displayName),
                 subtitle: Text(u.avatar.isEmpty ? '—' : u.avatar),
-                trailing: active == u.id ? const Icon(Icons.check_circle) : null,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (active == u.id) const Icon(Icons.check_circle),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      tooltip: 'Supprimer',
+                      onPressed: () => _confirmDelete(context, u),
+                    ),
+                  ],
+                ),
                 onTap: () async {
                   await context.read<ActiveUserStore>().setActiveUserId(u.id);
                   if (mounted) ScaffoldMessenger.of(context).showSnackBar(
@@ -65,6 +75,38 @@ class _UsersPageState extends State<UsersPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, User user) async {
+    final db = context.read<AppDb>();
+    final activeStore = context.read<ActiveUserStore>();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Supprimer le membre'),
+        content: Text('Supprimer "${user.displayName}" ? Ses avis et notes seront également supprimés.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await db.deleteUserById(user.id);
+    if (activeStore.activeUserId == user.id) {
+      await activeStore.setActiveUserId(null);
+    }
+    await _load();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('"${user.displayName}" supprimé.')),
+      );
+    }
   }
 
   Future<void> _addOrEdit(BuildContext context, {User? existing}) async {

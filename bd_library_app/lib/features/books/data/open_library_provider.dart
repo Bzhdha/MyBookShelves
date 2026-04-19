@@ -1,18 +1,22 @@
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html_parser;
+import '../../../core/app_logger.dart';
 import '../../../models/bd_metadata.dart';
 
 class OpenLibraryProvider {
-  Future<BdMetadata?> fetchByIsbn(String isbn13) async {
+  OpenLibraryProvider({this.logger});
 
+  final AppLogger? logger;
+
+  Future<BdMetadata?> fetchByIsbn(String isbn13) async {
     try {
-        final uri = Uri.parse(
+      final uri = Uri.parse(
         'https://isbndb.com/book/$isbn13',
       );
 
-      final response = await http.get(uri, headers: {'User-Agent': 'bd_library_app/1.0',  'Accept': 'text/html,application/xhtml+xml',}).timeout(const Duration(seconds: 5));
+      final response = await http.get(uri, headers: {'User-Agent': 'bd_library_app/1.0', 'Accept': 'text/html,application/xhtml+xml'}).timeout(const Duration(seconds: 5));
       if (response.statusCode != 200) {
-        print('Error recherche metadata: $response.statusCode');
+        logger?.log('OpenLibraryProvider.fetchByIsbn', {'isbn': isbn13, 'error': 'HTTP ${response.statusCode}'});
         return null;
       }
 
@@ -96,7 +100,7 @@ class OpenLibraryProvider {
         volumeNumber: volumeNumber,
       );
     } catch (e) {
-      print('Error fetching metadata: $e');
+      logger?.log('OpenLibraryProvider.fetchByIsbn', {'isbn': isbn13, 'error': e.toString()});
       return null;
     }
   }

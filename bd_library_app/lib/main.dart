@@ -25,7 +25,9 @@ import 'features/import_export/ui/import_review_page.dart';
 import 'features/import_export/ui/imported_libraries_list_page.dart';
 import 'features/settings/data/llm_key_store.dart';
 import 'features/settings/data/scan_settings_store.dart';
+import 'features/settings/data/app_lock_store.dart';
 import 'features/settings/ui/api_key_page.dart';
+import 'features/auth/ui/app_lock_screen.dart';
 import 'features/books/data/cover_scan_service.dart';
 import 'features/shelves/data/shelves_repository.dart';
 import 'features/shelves/domain/shelf_service.dart';
@@ -47,6 +49,8 @@ import 'features/reading/ui/start_reading_session_page.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final appLogger = AppLogger();
+  final appLockStore = AppLockStore();
+  await appLockStore.load();
   final db = AppDb();
   final booksRepository = BooksRepository(db);
   final shelvesRepository = ShelvesRepository(db);
@@ -56,7 +60,7 @@ Future<void> main() async {
   final scanSettingsStore = ScanSettingsStore();
   await scanSettingsStore.load();
   final metadataService = MetadataService(
-    openLibrary: OpenLibraryProvider(),
+    openLibrary: OpenLibraryProvider(logger: appLogger),
     bdTheque: BdThequeProvider(),
     llmProviders: [
       ChatGptProvider(llmKeyStore),
@@ -89,6 +93,7 @@ Future<void> main() async {
         Provider<ImportedLibraryStore>.value(value: ImportedLibraryStore()),
         ChangeNotifierProvider(create: (_) => ActiveUserStore()..load()),
         ChangeNotifierProvider<AppLogger>.value(value: appLogger),
+        ChangeNotifierProvider<AppLockStore>.value(value: appLockStore),
         Provider<ReadingRepository>.value(value: readingRepository),
         ChangeNotifierProvider<ReadingSessionStore>(
           create: (context) =>
@@ -108,8 +113,58 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Bibliothèque BD',
       theme: ThemeData(useMaterial3: true),
-      home: const HomePage(),
+      home: const _AppLockGate(),
     );
+  }
+}
+
+/// Shows [AppLockScreen] on first launch and on resume when lock is enabled.
+class _AppLockGate extends StatefulWidget {
+  const _AppLockGate();
+
+  @override
+  State<_AppLockGate> createState() => _AppLockGateState();
+}
+
+class _AppLockGateState extends State<_AppLockGate> with WidgetsBindingObserver {
+  bool _locked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkLock());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      final lockEnabled = context.read<AppLockStore>().enabled;
+      if (lockEnabled && mounted) setState(() => _locked = true);
+    } else if (state == AppLifecycleState.resumed && _locked) {
+      // keep showing lock screen — user must authenticate
+    }
+  }
+
+  void _checkLock() {
+    final lockEnabled = context.read<AppLockStore>().enabled;
+    if (lockEnabled && mounted) setState(() => _locked = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_locked) {
+      return AppLockScreen(onUnlocked: () {
+        if (mounted) setState(() => _locked = false);
+      });
+    }
+    return const HomePage();
   }
 }
 
@@ -424,6 +479,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   MaterialPageRoute(builder: (_) => const ScanSettingsPage()),
                 );
               },
+            ),
+            Consumer<AppLockStore>(
+              builder: (_, store, __) => SwitchListTile(
+                secondary: const Icon(Icons.lock_outline),
+                title: const Text('Verrouillage biométrique'),
+                subtitle: const Text('Demande biométrie/code à la réouverture'),
+                value: store.enabled,
+                onChanged: (v) => store.setEnabled(v),
+              ),
             ),
             const Divider(),
             ListTile(

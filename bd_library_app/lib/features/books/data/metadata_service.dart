@@ -72,7 +72,8 @@ class MetadataService {
     logger?.log('MetadataService._safeFetchLlm', {'provider': provider.runtimeType.toString(), 'isbn': isbn});
     try {
       return await provider.fetchByIsbn(isbn);
-    } catch (_) {
+    } catch (e) {
+      logger?.log('MetadataService._safeFetchLlm.error', {'provider': provider.runtimeType.toString(), 'isbn': isbn, 'error': e.toString()});
       return null;
     }
   }
@@ -81,7 +82,8 @@ class MetadataService {
     logger?.log('MetadataService._safeFetchBdTheque', {'isbn': isbn});
     try {
       return await bdTheque.fetchByIsbn(isbn);
-    } catch (_) {
+    } catch (e) {
+      logger?.log('MetadataService._safeFetchBdTheque.error', {'isbn': isbn, 'error': e.toString()});
       return null;
     }
   }
@@ -90,7 +92,8 @@ class MetadataService {
     logger?.log('MetadataService._safeFetchOpenLibrary', {'isbn': isbn});
     try {
       return await openLibrary.fetchByIsbn(isbn);
-    } catch (_) {
+    } catch (e) {
+      logger?.log('MetadataService._safeFetchOpenLibrary.error', {'isbn': isbn, 'error': e.toString()});
       return null;
     }
   }
