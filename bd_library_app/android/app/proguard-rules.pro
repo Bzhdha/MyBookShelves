@@ -18,6 +18,11 @@
 -dontwarn com.google.mlkit.vision.text.japanese.**
 -dontwarn com.google.mlkit.vision.text.korean.**
 
+# Apache Tika (transitive dependency of ML Kit) — not bundled on Android
+-dontwarn org.apache.tika.**
+-dontwarn javax.xml.stream.**
+-dontwarn javax.xml.**
+
 # ZXing (mobile_scanner)
 -keep class com.google.zxing.** { *; }
 -dontwarn com.google.zxing.**
