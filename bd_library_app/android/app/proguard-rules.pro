@@ -3,8 +3,8 @@
 -keep class io.flutter.plugins.** { *; }
 -dontwarn io.flutter.**
 
-# App entry point
--keep class com.example.bd_library_app.** { *; }
+# Keep only the Activity entry point; let R8 obfuscate the rest
+-keep public class com.example.bd_library_app.MainActivity
 
 # ML Kit (google_mlkit_text_recognition + mobile_scanner)
 -keep class com.google.mlkit.** { *; }

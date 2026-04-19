@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/app_logger.dart';
@@ -65,12 +66,9 @@ Si tu ne trouves aucune information pour l'ISBN demandé, retourne un objet vide
       final text = message?['content'] as String?;
       if (text == null || text.trim().isEmpty) return null;
 
-      _logger?.log('MistralProvider.fetchByIsbn', {
-        'isbn': isbn,
-        'systemPrompt': _systemPrompt,
-        'userPrompt': userContent,
-        'rawResponse': text,
-      });
+      if (kDebugMode) {
+        _logger?.log('MistralProvider.fetchByIsbn', {'isbn': isbn});
+      }
 
       final meta = jsonDecode(text) as Map<String, dynamic>;
       return parseLlmMetadataJson(meta);

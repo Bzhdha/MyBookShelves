@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Block all cleartext (HTTP) traffic app-wide -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Trust only system CAs (no user-installed CAs in release) -->
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!--
+        Certificate pinning placeholder for LLM API providers.
+        To activate: replace the pin hashes with real SHA-256 SPKI hashes.
+
+        Get the hash with:
+          openssl s_client -connect api.openai.com:443 | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64
+
+        Always include a backup pin in case the cert rotates.
+    -->
+    <!--
+    <domain-config>
+        <domain includeSubdomains="false">api.openai.com</domain>
+        <domain includeSubdomains="false">api.anthropic.com</domain>
+        <domain includeSubdomains="false">api.mistral.ai</domain>
+        <domain includeSubdomains="false">api.groq.com</domain>
+        <pin-set expiration="2027-01-01">
+            <pin digest="SHA-256">REPLACE_WITH_REAL_PIN_HASH=</pin>
+            <pin digest="SHA-256">REPLACE_WITH_BACKUP_PIN_HASH=</pin>
+        </pin-set>
+    </domain-config>
+    -->
+</network-security-config>
