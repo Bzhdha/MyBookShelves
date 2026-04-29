@@ -111,4 +111,8 @@ class ReadingRepository {
     out.sort((a, b) => a.$1.title.compareTo(b.$1.title));
     return out;
   }
+
+  Future<Book?> lastFinishedBook()=>_db.getLastFinishedBook();
+  Future<List<(Book,ReadingProgressRow)>> booksInProgress()=>_db.getBooksInProgress();
+  Future<List<(SeriesData,List<int>)>> seriesWithMissingVolumes()=>_db.getSeriesWithMissingVolumes();
 }
