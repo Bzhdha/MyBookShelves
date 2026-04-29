@@ -31,10 +31,6 @@ class _AppLockScreenState extends State<AppLockScreen> {
     try {
       final authenticated = await _auth.authenticate(
         localizedReason: 'Déverrouillez pour accéder à la bibliothèque',
-        options: const AuthenticationOptions(
-          biometricOnly: false,
-          stickyAuth: true,
-        ),
       );
       if (authenticated && mounted) {
         widget.onUnlocked();

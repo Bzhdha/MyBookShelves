@@ -226,7 +226,7 @@ class LibraryTransferService {
   /// PICK ZIP
   /// ----------------------------
   Future<File?> pickZipFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['zip'],
     );
@@ -245,7 +245,7 @@ class LibraryTransferService {
 
   /// Choisir un fichier bibliothèque (JSON ou ZIP).
   Future<File?> pickLibraryFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json', 'zip'],
     );
@@ -257,7 +257,7 @@ class LibraryTransferService {
   /// PICK JSON
   /// ----------------------------
   Future<File?> pickJsonFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json'],
     );

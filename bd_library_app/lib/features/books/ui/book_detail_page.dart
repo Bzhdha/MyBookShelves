@@ -341,7 +341,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
   }
 
   Future<void> _pickImageForCoverOcr(BuildContext context) async {
-    final r = await FilePicker.platform.pickFiles(type: FileType.image);
+    final r = await FilePicker.pickFiles(type: FileType.image);
     if (!mounted) return;
     final path = r?.files.single.path;
     if (path == null) return;
