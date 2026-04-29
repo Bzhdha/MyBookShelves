@@ -507,6 +507,31 @@ class AppDb extends _$AppDb {
         .get();
     return rows.length;
   }
+
+  Future<Book?> getLastFinishedBook() async {
+    final rows = await (select(readingProgress)..where((t)=>t.status.equals(2)&t.readingFinishedAt.isNotNull())..orderBy([(t)=>OrderingTerm.desc(t.readingFinishedAt)])..limit(1)).get();
+    if(rows.isEmpty)return null;
+    return getBookById(rows.first.bookId);
+  }
+
+  Future<List<(Book,ReadingProgressRow)>> getBooksInProgress() async {
+    final rows = await (select(readingProgress)..where((t)=>t.status.equals(1))).get();
+    final out=<(Book,ReadingProgressRow)>[];
+    for(final r in rows){final b=await getBookById(r.bookId);if(b!=null)out.add((b,r));}
+    return out;
+  }
+
+  Future<List<(SeriesData,List<int>)>> getSeriesWithMissingVolumes() async {
+    final all=await getAllSeries();final out=<(SeriesData,List<int>)>[];
+    for(final s in all){
+      final exp=s.expectedVolumes;if(exp==null||exp<=0)continue;
+      final books=await getBooksBySeries(s.id);
+      final owned=books.map((b)=>b.volumeNumber).whereType<int>().toSet();
+      final missing=<int>[];for(int i=1;i<=exp;i++){if(!owned.contains(i))missing.add(i);}
+      if(missing.isNotEmpty)out.add((s,missing));
+    }
+    return out;
+  }
 }
 
 /// Constantes statut de lecture (alignées sur [ReadingProgress.status]).

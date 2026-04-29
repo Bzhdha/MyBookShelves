@@ -45,6 +45,7 @@ import 'features/reading/ui/reading_goals_page.dart';
 import 'features/reading/ui/reading_history_page.dart';
 import 'features/reading/ui/reading_stats_page.dart';
 import 'features/reading/ui/start_reading_session_page.dart';
+import 'features/home/new_home_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -164,7 +165,7 @@ class _AppLockGateState extends State<_AppLockGate> with WidgetsBindingObserver 
         if (mounted) setState(() => _locked = false);
       });
     }
-    return const HomePage();
+    return const NewHomePage();
   }
 }
 
