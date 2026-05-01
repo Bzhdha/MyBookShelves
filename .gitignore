@@ -1,0 +1,6 @@
+bd_library_app/linux/flutter/generated_plugin_registrant.cc
+bd_library_app/linux/flutter/generated_plugins.cmake
+bd_library_app/macos/Flutter/GeneratedPluginRegistrant.swift
+bd_library_app/windows/flutter/generated_plugin_registrant.cc
+bd_library_app/windows/flutter/generated_plugins.cmake
+bd_library_app/pubspec.lock
