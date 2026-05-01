@@ -95,6 +95,31 @@ class BdThequeProvider {
         }
       }
 
+      String? seriesTitle;
+      String? seriesBookIndex;
+      final seriesInfo = volumeInfo['seriesInfo'];
+      if (seriesInfo is Map<String, dynamic>) {
+        final s = seriesInfo['series'];
+        if (s is Map<String, dynamic>) {
+          final st = s['title'];
+          if (st != null && st.toString().trim().isNotEmpty) {
+            seriesTitle = st.toString().trim();
+          }
+          final dn = s['displayNumber'] ?? seriesInfo['bookDisplayNumber'];
+          if (dn != null && dn.toString().trim().isNotEmpty) {
+            seriesBookIndex = dn.toString().trim();
+          }
+        } else if (s is String && s.trim().isNotEmpty) {
+          seriesTitle = s.trim();
+        }
+      }
+      if (volumeNumber == null &&
+          seriesBookIndex != null &&
+          seriesBookIndex.isNotEmpty) {
+        final digits = RegExp(r'(\d+)').firstMatch(seriesBookIndex);
+        if (digits != null) volumeNumber = digits.group(1);
+      }
+
       return BdMetadata(
         title: title,
         authors: authors,
@@ -103,6 +128,7 @@ class BdThequeProvider {
         description: description,
         coverUrl: coverUrl,
         volumeNumber: volumeNumber,
+        seriesTitle: seriesTitle,
       );
     } catch (_) {
       return null;

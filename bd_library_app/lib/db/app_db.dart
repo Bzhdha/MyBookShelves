@@ -206,6 +206,16 @@ class AppDb extends _$AppDb {
   Future<SeriesData?> getSeriesById(String id) =>
       (select(series)..where((t) => t.id.equals(id))).getSingleOrNull();
 
+  /// Trouve une série par nom (insensible à la casse, espaces bords ignorés côté appelant).
+  Future<SeriesData?> findSeriesByNameInsensitive(String name) {
+    final n = name.trim();
+    if (n.isEmpty) {
+      return Future.value(null);
+    }
+    return (select(series)..where((t) => t.name.lower().equals(n.toLowerCase())))
+        .getSingleOrNull();
+  }
+
   Future<void> upsertSeries(SeriesCompanion s) =>
       into(series).insertOnConflictUpdate(s);
 

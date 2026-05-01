@@ -7,6 +7,9 @@ class BdMetadata {
   final String? coverUrl;
   final String? volumeNumber;
 
+  /// Série / collection regroupant plusieurs tomes (nom d’affichage).
+  final String? seriesTitle;
+
   BdMetadata({
     this.title,
     this.authors,
@@ -15,5 +18,6 @@ class BdMetadata {
     this.description,
     this.coverUrl,
     this.volumeNumber,
+    this.seriesTitle,
   });
 }

@@ -1,4 +1,3 @@
-import 'package:drift/drift.dart' hide Column;
 
 import '../../../db/app_db.dart';
 
@@ -8,6 +7,16 @@ class BooksRepository {
   BooksRepository(this._db);
 
   Future<List<SeriesData>> getSeriesAll() => _db.getAllSeries();
+
+  Future<SeriesData?> findSeriesByNameInsensitive(String name) =>
+      _db.findSeriesByNameInsensitive(name);
+
+  Future<SeriesData?> getSeriesById(String id) => _db.getSeriesById(id);
+
+  Future<void> upsertSeries(SeriesCompanion s) => _db.upsertSeries(s);
+
+  Future<List<Book>> getBooksBySeries(String seriesId) =>
+      _db.getBooksBySeries(seriesId);
 
   /// Flux de tous les livres ordonnés par titre.
   Stream<List<Book>> watchAllBooks() => _db.watchAllBooks();

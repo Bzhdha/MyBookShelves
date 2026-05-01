@@ -74,6 +74,7 @@ Future<void> main() async {
   final coverCacheService = CoverCacheService();
   final bookService = BookService(
     booksRepository,
+    shelvesRepository,
     metadataService,
     coverCacheService,
     appLogger,

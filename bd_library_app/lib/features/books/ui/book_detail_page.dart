@@ -28,6 +28,8 @@ class _BookDetailPageState extends State<BookDetailPage> {
   Book? book;
   List<Copy> copies = [];
   List<Shelf> bookShelves = [];
+  String? _seriesName;
+  List<Book> _seriesSiblings = [];
   String? _backCoverPath;
   Map<String, UserCopyMeta> _copyMetas = {};
   Map<String, String> _userNameById = {};
@@ -49,6 +51,9 @@ class _BookDetailPageState extends State<BookDetailPage> {
     final userId = context.read<ActiveUserStore>().activeUserId;
 
     final b = await bookService.getBook(widget.bookId);
+    final seriesName = await bookService.getSeriesNameForBookId(b?.seriesId);
+    final siblings =
+        b != null ? await bookService.getSiblingBooksInSeries(b.id) : <Book>[];
     final c = await bookService.getCopies(widget.bookId);
     final shelfIds = await shelfService.getShelfIdsForBook(widget.bookId);
     final allShelves = await shelfService.getAllShelves();
@@ -67,6 +72,8 @@ class _BookDetailPageState extends State<BookDetailPage> {
     if (!mounted) return;
     setState(() {
       book = b;
+      _seriesName = seriesName;
+      _seriesSiblings = siblings;
       copies = c;
       bookShelves = shelves;
       _backCoverPath = backPath;
@@ -156,7 +163,40 @@ class _BookDetailPageState extends State<BookDetailPage> {
           Text('ISBN: ${book!.isbn ?? "-"}'),
           Text('Auteurs: ${book!.authors}'),
           Text('Éditeur: ${book!.publisher?.trim().isNotEmpty == true ? book!.publisher! : "-"}'),
+          Text(
+            'Série: ${_seriesName?.trim().isNotEmpty == true ? _seriesName! : "-"}',
+          ),
           Text('Tome: ${book!.volumeNumber ?? "-"}'),
+          if (_seriesSiblings.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Autres tomes',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            ..._seriesSiblings.map((other) {
+              final vol = other.volumeNumber;
+              final subtitle = vol != null ? 'Tome $vol' : null;
+              return ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: Text(other.title),
+                subtitle: subtitle != null ? Text(subtitle) : null,
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => BookDetailPage(bookId: other.id),
+                    ),
+                  );
+                  if (mounted) await _load();
+                },
+              );
+            }),
+          ],
           if (book!.summary.trim().isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(
@@ -363,8 +403,11 @@ class _BookDetailPageState extends State<BookDetailPage> {
       await context.read<BookService>().updateBookCoverFromScan(widget.bookId, result.coverPath!);
     }
     setState(() {
-      if (isCover) _coverImageVersion++;
-      else _backImageVersion++;
+      if (isCover) {
+        _coverImageVersion++;
+      } else {
+        _backImageVersion++;
+      }
     });
     await _load();
   }
@@ -417,7 +460,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
             fit: BoxFit.cover,
             height: 200,
             width: double.infinity,
-            errorBuilder: (_, __, ___) => _coverPlaceholder(),
+            errorBuilder: (_, _, _) => _coverPlaceholder(),
           ),
         ),
       ],
@@ -491,10 +534,14 @@ class _BookDetailPageState extends State<BookDetailPage> {
             runSpacing: 8,
             children: bookShelves.map((shelf) {
               final color = _colorFromHex(shelf.color);
+              final onlyDefault = bookShelves.length == 1 &&
+                  shelf.id == DefaultUnclassifiedShelf.id;
               return Chip(
                 avatar: CircleAvatar(backgroundColor: color),
                 label: Text(shelf.name),
-                onDeleted: () => _removeFromShelf(context, shelf.id),
+                onDeleted: onlyDefault
+                    ? null
+                    : () => _removeFromShelf(context, shelf.id),
               );
             }).toList(),
           ),

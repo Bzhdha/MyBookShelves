@@ -43,7 +43,12 @@ class ShelfService {
     );
   }
 
-  Future<void> deleteShelf(String id) => _repo.deleteShelfById(id);
+  /// Retourne false si l'étagère est l'étagère système « Livres à classer ».
+  Future<bool> deleteShelf(String id) async {
+    if (id == DefaultUnclassifiedShelf.id) return false;
+    await _repo.deleteShelfById(id);
+    return true;
+  }
 
   Future<List<String>> getShelfIdsForBook(String bookId) =>
       _repo.getShelfIdsByBook(bookId);

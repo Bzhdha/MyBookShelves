@@ -46,6 +46,24 @@ Offset _toImageSpace(Offset localInImageWidget, _ImageLayout layout) {
   return Offset(localInImageWidget.dx / layout.scale, localInImageWidget.dy / layout.scale);
 }
 
+Rect _normalizeRectFromOffsets(Offset a, Offset b) {
+  final left = math.min(a.dx, b.dx);
+  final top = math.min(a.dy, b.dy);
+  final right = math.max(a.dx, b.dx);
+  final bottom = math.max(a.dy, b.dy);
+  return Rect.fromLTRB(left, top, right, bottom);
+}
+
+int _compareReadingOrder(List<TextLine> lines, int ai, int bi) {
+  final ra = lines[ai].boundingBox;
+  final rb = lines[bi].boundingBox;
+  const band = 10.0;
+  if ((ra.center.dy - rb.center.dy).abs() < band) {
+    return ra.left.compareTo(rb.left);
+  }
+  return ra.top.compareTo(rb.top);
+}
+
 /// Reconnaissance du texte sur une image de couverture, puis sélection dans l'ordre
 /// du titre, de l'auteur et de l'éditeur en touchant les zones détectées.
 class CoverOcrZonesPage extends StatefulWidget {
@@ -71,7 +89,15 @@ class _CoverOcrZonesPageState extends State<CoverOcrZonesPage> {
 
   List<TextLine> _lines = [];
   int _step = 0;
-  final List<int?> _pickedLineIndex = [null, null, null];
+  /// Indices de lignes OCR par champ (titre, auteur, éditeur), ordre de lecture.
+  final List<List<int>> _pickedLineGroups = [[], [], []];
+  final Set<int> _ignoredLineIndices = {};
+  bool _ignoreZonesMode = false;
+
+  Offset? _dragAImage;
+  Offset? _dragBImage;
+  Offset? _panLocalStart;
+  Offset? _panLocalEnd;
 
   @override
   void initState() {
@@ -133,26 +159,87 @@ class _CoverOcrZonesPageState extends State<CoverOcrZonesPage> {
   String _norm(String? s) =>
       (s ?? '').trim().replaceAll(RegExp(r'\s+'), ' ');
 
-  void _onImageTap(Offset imagePoint) {
-    if (_step >= 3 || _lines.isEmpty) return;
+  /// Retire les fragments type balises `<...>` parfois lus à tort par l’OCR.
+  String _stripTagLike(String s) => s.replaceAll(RegExp(r'<[^>]*>'), '');
+
+  String _fieldTextFromIndices(List<int> indices) {
+    if (indices.isEmpty) return '';
+    final sorted = List<int>.from(indices)
+      ..sort((a, b) => _compareReadingOrder(_lines, a, b));
+    final raw = sorted.map((i) => _lines[i].text).join(' ');
+    return _norm(_stripTagLike(raw));
+  }
+
+  int? _hitLineAt(Offset imagePoint, {bool respectIgnored = true}) {
     var hitIndex = -1;
     for (var i = 0; i < _lines.length; i++) {
+      if (respectIgnored && _ignoredLineIndices.contains(i)) continue;
       final r = _lines[i].boundingBox;
       if (r.inflate(8).contains(imagePoint)) {
         hitIndex = i;
         break;
       }
     }
-    if (hitIndex < 0) {
+    return hitIndex >= 0 ? hitIndex : null;
+  }
+
+  void _toggleIgnoredAt(Offset imagePoint) {
+    final hit = _hitLineAt(imagePoint, respectIgnored: false);
+    if (hit == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Touchez un texte détecté (cadre coloré).'),
+        const SnackBar(content: Text('Touchez un cadre OCR pour l’ignorer ou le rétablir.')),
+      );
+      return;
+    }
+    setState(() {
+      if (_ignoredLineIndices.contains(hit)) {
+        _ignoredLineIndices.remove(hit);
+      } else {
+        _ignoredLineIndices.add(hit);
+      }
+    });
+  }
+
+  void _onImageTap(Offset imagePoint) {
+    if (_step >= 3 || _lines.isEmpty) return;
+    final hitIndex = _hitLineAt(imagePoint);
+    if (hitIndex == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _ignoredLineIndices.isEmpty
+                ? 'Touchez un texte détecté (cadre coloré), ou tracez un rectangle autour de plusieurs lignes.'
+                : 'Zone ignorée ou hors cadre — désactivez « Ignorer des zones » ou choisissez une autre ligne.',
+          ),
         ),
       );
       return;
     }
     setState(() {
-      _pickedLineIndex[_step] = hitIndex;
+      _pickedLineGroups[_step] = [hitIndex];
+      _step++;
+    });
+  }
+
+  void _onRectSelection(Rect imageRect) {
+    if (_step >= 3 || _lines.isEmpty) return;
+    final hits = <int>{};
+    for (var i = 0; i < _lines.length; i++) {
+      if (_ignoredLineIndices.contains(i)) continue;
+      if (imageRect.overlaps(_lines[i].boundingBox)) {
+        hits.add(i);
+      }
+    }
+    if (hits.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aucun texte dans le rectangle (hors zones ignorées).'),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _pickedLineGroups[_step] = hits.toList();
       _step++;
     });
   }
@@ -161,33 +248,29 @@ class _CoverOcrZonesPageState extends State<CoverOcrZonesPage> {
     if (_step <= 0) return;
     setState(() {
       _step--;
-      _pickedLineIndex[_step] = null;
+      _pickedLineGroups[_step] = [];
     });
   }
 
   void _resetPicks() {
     setState(() {
       _step = 0;
-      _pickedLineIndex[0] = null;
-      _pickedLineIndex[1] = null;
-      _pickedLineIndex[2] = null;
+      _pickedLineGroups[0] = [];
+      _pickedLineGroups[1] = [];
+      _pickedLineGroups[2] = [];
     });
   }
 
   Future<void> _apply() async {
-    final title = _pickedLineIndex[0] != null
-        ? _norm(_lines[_pickedLineIndex[0]!].text)
-        : '';
-    final authors = _pickedLineIndex[1] != null
-        ? _norm(_lines[_pickedLineIndex[1]!].text)
-        : '';
-    final publisher = _pickedLineIndex[2] != null
-        ? _norm(_lines[_pickedLineIndex[2]!].text)
-        : '';
+    final title = _fieldTextFromIndices(_pickedLineGroups[0]);
+    final authors = _fieldTextFromIndices(_pickedLineGroups[1]);
+    final publisher = _fieldTextFromIndices(_pickedLineGroups[2]);
 
     if (title.isEmpty && authors.isEmpty && publisher.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sélectionnez les trois zones ou annulez.')),
+        const SnackBar(
+          content: Text('Sélectionnez au moins une zone (titre, auteur ou éditeur) ou annulez.'),
+        ),
       );
       return;
     }
@@ -271,13 +354,16 @@ class _CoverOcrZonesPageState extends State<CoverOcrZonesPage> {
   }
 
   String _instruction() {
+    if (_ignoreZonesMode) {
+      return 'Mode ignorer : touchez les cadres à exclure (prix, logos…). Touchez de nouveau pour rétablir.';
+    }
     switch (_step) {
       case 0:
-        return '1/3 — Touchez la zone du titre sur l’image';
+        return '1/3 — Titre : touchez une ligne ou tracez un rectangle autour du bloc multi-lignes.';
       case 1:
-        return '2/3 — Touchez la zone de l’auteur (ou des auteurs)';
+        return '2/3 — Auteur(s) : idem (ligne ou rectangle).';
       case 2:
-        return '3/3 — Touchez la zone de l’éditeur';
+        return '3/3 — Éditeur : idem.';
       default:
         return 'Vérifiez les sélections puis enregistrez.';
     }
@@ -304,13 +390,22 @@ class _CoverOcrZonesPageState extends State<CoverOcrZonesPage> {
       appBar: AppBar(
         title: const Text('Texte sur la couverture'),
         actions: [
+          IconButton(
+            tooltip: _ignoreZonesMode ? 'Quitter le mode ignorer' : 'Ignorer des zones OCR',
+            icon: Icon(
+              _ignoreZonesMode ? Icons.filter_alt_off : Icons.visibility_off_outlined,
+            ),
+            onPressed: () {
+              setState(() => _ignoreZonesMode = !_ignoreZonesMode);
+            },
+          ),
           if (_step > 0 && _step <= 3)
             IconButton(
               tooltip: 'Annuler le dernier choix',
               icon: const Icon(Icons.undo),
               onPressed: _undoLast,
             ),
-          if (_step > 0 || _pickedLineIndex.any((e) => e != null))
+          if (_step > 0 || _pickedLineGroups.any((g) => g.isNotEmpty))
             TextButton(
               onPressed: _resetPicks,
               child: const Text('Recommencer'),
@@ -353,9 +448,52 @@ class _CoverOcrZonesPageState extends State<CoverOcrZonesPage> {
                                 height: layout.displayed.height,
                                 child: GestureDetector(
                                   behavior: HitTestBehavior.opaque,
-                                  onTapUp: (d) {
-                                    final imgPt = _toImageSpace(d.localPosition, layout);
-                                    _onImageTap(imgPt);
+                                  onPanStart: (d) {
+                                    setState(() {
+                                      _panLocalStart = d.localPosition;
+                                      _panLocalEnd = d.localPosition;
+                                      _dragAImage = _toImageSpace(d.localPosition, layout);
+                                      _dragBImage = _dragAImage;
+                                    });
+                                  },
+                                  onPanUpdate: (d) {
+                                    setState(() {
+                                      _panLocalEnd = d.localPosition;
+                                      _dragBImage = _toImageSpace(d.localPosition, layout);
+                                    });
+                                  },
+                                  onPanEnd: (d) {
+                                    _panLocalEnd = d.localPosition;
+                                    final localDist = (_panLocalEnd! - _panLocalStart!).distance;
+                                    final a = _dragAImage!;
+                                    final b = _dragBImage!;
+
+                                    setState(() {
+                                      _dragAImage = null;
+                                      _dragBImage = null;
+                                      _panLocalStart = null;
+                                      _panLocalEnd = null;
+                                    });
+
+                                    if (_ignoreZonesMode) {
+                                      _toggleIgnoredAt(a);
+                                      return;
+                                    }
+                                    if (_step >= 3) return;
+
+                                    const tapSlop = 14.0;
+                                    if (localDist < tapSlop) {
+                                      _onImageTap(a);
+                                      return;
+                                    }
+
+                                    final imageRect = _normalizeRectFromOffsets(a, b);
+                                    final minSide = 12.0 / layout.scale;
+                                    if (imageRect.width < minSide || imageRect.height < minSide) {
+                                      _onImageTap(a);
+                                      return;
+                                    }
+                                    _onRectSelection(imageRect);
                                   },
                                   child: Stack(
                                     fit: StackFit.expand,
@@ -368,8 +506,11 @@ class _CoverOcrZonesPageState extends State<CoverOcrZonesPage> {
                                         painter: _OcrLinesPainter(
                                           lines: _lines,
                                           scale: layout.scale,
-                                          pickedIndices: _pickedLineIndex,
-                                          step: _step,
+                                          pickedGroups: _pickedLineGroups,
+                                          ignoredIndices: _ignoredLineIndices,
+                                          draftRectImage: (_dragAImage != null && _dragBImage != null)
+                                              ? _normalizeRectFromOffsets(_dragAImage!, _dragBImage!)
+                                              : null,
                                         ),
                                       ),
                                     ],
@@ -399,18 +540,37 @@ class _CoverOcrZonesPageState extends State<CoverOcrZonesPage> {
   }
 }
 
+Rect _unionBounding(Iterable<Rect> rects) {
+  final it = rects.iterator;
+  if (!it.moveNext()) return Rect.zero;
+  var l = it.current.left;
+  var t = it.current.top;
+  var r = it.current.right;
+  var b = it.current.bottom;
+  while (it.moveNext()) {
+    final x = it.current;
+    l = math.min(l, x.left);
+    t = math.min(t, x.top);
+    r = math.max(r, x.right);
+    b = math.max(b, x.bottom);
+  }
+  return Rect.fromLTRB(l, t, r, b);
+}
+
 class _OcrLinesPainter extends CustomPainter {
   _OcrLinesPainter({
     required this.lines,
     required this.scale,
-    required this.pickedIndices,
-    required this.step,
+    required this.pickedGroups,
+    required this.ignoredIndices,
+    this.draftRectImage,
   });
 
   final List<TextLine> lines;
   final double scale;
-  final List<int?> pickedIndices;
-  final int step;
+  final List<List<int>> pickedGroups;
+  final Set<int> ignoredIndices;
+  final Rect? draftRectImage;
 
   static const _titleC = Color(0x6600BCD4);
   static const _authorC = Color(0x664CAF50);
@@ -429,20 +589,87 @@ class _OcrLinesPainter extends CustomPainter {
         r.height * scale,
       );
 
+      if (ignoredIndices.contains(i)) {
+        canvas.drawRect(dr, Paint()..color = const Color(0x22000000));
+        canvas.drawRect(
+          dr,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5
+            ..color = Colors.red.withValues(alpha: 0.4),
+        );
+        continue;
+      }
+
       var fill = _pendingC;
-      if (pickedIndices[0] == i) fill = _titleC;
-      if (pickedIndices[1] == i) fill = _authorC;
-      if (pickedIndices[2] == i) fill = _publisherC;
+      int? pickedStep;
+      for (var s = 0; s < pickedGroups.length; s++) {
+        if (pickedGroups[s].contains(i)) {
+          pickedStep = s;
+          break;
+        }
+      }
+      if (pickedStep != null) {
+        fill = pickedStep == 0
+            ? _titleC
+            : pickedStep == 1
+                ? _authorC
+                : _publisherC;
+      }
 
       final border = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2
-        ..color = step <= 2 && pickedIndices.contains(i)
-            ? Colors.blueGrey.shade700
-            : Colors.white54;
+        ..color = pickedStep != null ? Colors.blueGrey.shade700 : Colors.white54;
 
       canvas.drawRect(dr, Paint()..color = fill);
       canvas.drawRect(dr, border);
+    }
+
+    for (var s = 0; s < pickedGroups.length; s++) {
+      final g = pickedGroups[s];
+      if (g.length < 2) continue;
+      final rects = g.map((idx) => lines[idx].boundingBox).toList();
+      final u = _unionBounding(rects);
+      final dr = Rect.fromLTWH(
+        u.left * scale,
+        u.top * scale,
+        u.width * scale,
+        u.height * scale,
+      );
+      final stroke = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..color = s == 0
+            ? const Color(0xCC00ACC1)
+            : s == 1
+                ? const Color(0xCC2E7D32)
+                : const Color(0xCCEF6C00);
+      canvas.drawRect(dr, stroke);
+    }
+
+    if (draftRectImage != null) {
+      final r = draftRectImage!;
+      final dr = Rect.fromLTWH(
+        r.left * scale,
+        r.top * scale,
+        r.width * scale,
+        r.height * scale,
+      );
+      canvas.drawRect(
+        dr,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = Colors.black.withValues(alpha: 0.45),
+      );
+      canvas.drawRect(
+        dr,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = Colors.white.withValues(alpha: 0.95),
+      );
     }
   }
 

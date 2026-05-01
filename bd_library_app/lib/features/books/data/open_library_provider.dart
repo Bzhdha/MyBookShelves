@@ -44,6 +44,7 @@ class OpenLibraryProvider {
       // Publisher / Publish Date
       final publisher = tdTextFor('Publisher:');
       final publishDate = tdTextFor('Publish Date:');
+      final seriesTitle = tdTextFor('Series:');
 
       // Authors: on préfère prendre le texte des <a> dans le <td>
       List<String>? authors;
@@ -98,6 +99,7 @@ class OpenLibraryProvider {
         publishedDate: publishDate,
         coverUrl: coverUrl,
         volumeNumber: volumeNumber,
+        seriesTitle: seriesTitle?.trim().isNotEmpty == true ? seriesTitle!.trim() : null,
       );
     } catch (e) {
       logger?.log('OpenLibraryProvider.fetchByIsbn', {'isbn': isbn13, 'error': e.toString()});

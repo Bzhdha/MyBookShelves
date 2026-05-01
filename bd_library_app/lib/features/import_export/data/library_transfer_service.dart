@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:archive/archive.dart';
 import 'package:archive/archive_io.dart';
 import 'package:drift/drift.dart';
 import 'package:file_picker/file_picker.dart';
@@ -11,6 +10,34 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../db/app_db.dart';
 import '../../../models/export_model.dart';
+
+/// Couvertures locales + photo dos (`<bookId>_back.jpg`) dans le ZIP sous `covers/`.
+Future<void> addLocalCoverImagesToZip(
+  ZipFileEncoder encoder,
+  List<Book> allBooks,
+) async {
+  final doc = await getApplicationDocumentsDirectory();
+  final coversDir = Directory(p.join(doc.path, 'covers'));
+  final addedBasenames = <String>{};
+
+  Future<void> tryAdd(String? filePath) async {
+    if (filePath == null || filePath.trim().isEmpty) return;
+    final f = File(filePath);
+    if (!await f.exists()) return;
+    final name = p.basename(f.path);
+    if (addedBasenames.contains(name)) return;
+    addedBasenames.add(name);
+    final bytes = await f.readAsBytes();
+    encoder.addArchiveFile(ArchiveFile('covers/$name', bytes.length, bytes));
+  }
+
+  for (final b in allBooks) {
+    await tryAdd(b.coverLocalPath);
+    if (await coversDir.exists()) {
+      await tryAdd(p.join(coversDir.path, '${b.id}_back.jpg'));
+    }
+  }
+}
 
 /// ----------------------------
 /// Import conflicts
@@ -50,6 +77,13 @@ class ImportPlan {
   /// Mapping importBookId -> localBookId (après matching). Rempli lors de buildImportPlan.
   final Map<String, String> importedWorkIdToLocalWorkId;
 
+  /// v3+ : étagères, classement, suivi de lecture (listes vides si export ancien).
+  final List<ExportShelf> shelvesToUpsert;
+  final List<ExportBookShelf> bookShelfLinks;
+  final List<ExportReadingProgress> readingProgressToUpsert;
+  final List<ExportReadingSession> readingSessionsToUpsert;
+  final List<ExportReadingGoals> readingGoalsToUpsert;
+
   ImportPlan({
     required this.seriesToUpsert,
     required this.booksToCreate,
@@ -57,6 +91,11 @@ class ImportPlan {
     required this.conflicts,
     required this.copiesToUpsert,
     required this.importedWorkIdToLocalWorkId,
+    this.shelvesToUpsert = const [],
+    this.bookShelfLinks = const [],
+    this.readingProgressToUpsert = const [],
+    this.readingSessionsToUpsert = const [],
+    this.readingGoalsToUpsert = const [],
   });
 }
 
@@ -67,22 +106,24 @@ class LibraryTransferService {
   final AppDb db;
   LibraryTransferService(this.db);
 
-  /// ----------------------------
-  /// EXPORT ZIP (library.json + covers/)
-  /// ----------------------------
-  Future<File> exportToZipFile() async {
+  /// Charge l’état complet pour [library.json] (v3 : séries, œuvres, exemplaires, étagères, lecture).
+  Future<ExportLibrary> buildExportLibraryPayload() async {
     final allSeries = await db.getAllSeries();
     final allBooks = await db.getAllBooks();
 
-    // copies
     final allCopies = <Copy>[];
     for (final b in allBooks) {
-      final cs = await db.getCopiesByBook(b.id);
-      allCopies.addAll(cs);
+      allCopies.addAll(await db.getCopiesByBook(b.id));
     }
 
-    final payload = ExportLibrary(
-      version: 2,
+    final allShelves = await db.getAllShelves();
+    final bookShelfRows = await db.select(db.bookShelf).get();
+    final progressRows = await db.allReadingProgressRows();
+    final sessionRows = await db.select(db.readingSessions).get();
+    final goalRows = await db.select(db.readingGoals).get();
+
+    return ExportLibrary(
+      version: 3,
       exportedAt: DateTime.now(),
       series: allSeries
           .map((s) => ExportSeries(
@@ -121,7 +162,58 @@ class LibraryTransferService {
                 updatedAt: c.updatedAt,
               ))
           .toList(),
+      shelves: allShelves
+          .map((s) => ExportShelf(
+                id: s.id,
+                name: s.name,
+                color: s.color,
+                sortOrder: s.sortOrder,
+                updatedAt: s.updatedAt,
+              ))
+          .toList(),
+      bookShelves: bookShelfRows
+          .map((r) => ExportBookShelf(bookId: r.bookId, shelfId: r.shelfId))
+          .toList(),
+      readingProgress: progressRows
+          .map((r) => ExportReadingProgress(
+                bookId: r.bookId,
+                status: r.status,
+                currentPage: r.currentPage,
+                totalPages: r.totalPages,
+                usePercentage: r.usePercentage,
+                progressPercent: r.progressPercent,
+                readingStartedAt: r.readingStartedAt,
+                readingFinishedAt: r.readingFinishedAt,
+              ))
+          .toList(),
+      readingSessions: sessionRows
+          .map((s) => ExportReadingSession(
+                id: s.id,
+                bookId: s.bookId,
+                startedAt: s.startedAt,
+                endedAt: s.endedAt,
+                startPage: s.startPage,
+                endPage: s.endPage,
+                durationSeconds: s.durationSeconds,
+                finishedBook: s.finishedBook,
+              ))
+          .toList(),
+      readingGoals: goalRows
+          .map((g) => ExportReadingGoals(
+                id: g.id,
+                booksPerMonth: g.booksPerMonth,
+                booksPerYear: g.booksPerYear,
+              ))
+          .toList(),
     );
+  }
+
+  /// ----------------------------
+  /// EXPORT ZIP (library.json + covers/)
+  /// ----------------------------
+  Future<File> exportToZipFile() async {
+    final allBooks = await db.getAllBooks();
+    final payload = await buildExportLibraryPayload();
 
     final tmp = await getTemporaryDirectory();
     final zipPath = p.join(tmp.path, 'bd_library_export.zip');
@@ -133,17 +225,7 @@ class LibraryTransferService {
     final jsonBytes = utf8.encode(jsonEncode(payload.toJson()));
     encoder.addArchiveFile(ArchiveFile('library.json', jsonBytes.length, jsonBytes));
 
-    // Covers locales
-    for (final b in allBooks) {
-      final localPath = b.coverLocalPath;
-      if (localPath == null) continue;
-      final f = File(localPath);
-      if (!await f.exists()) continue;
-
-      final bytes = await f.readAsBytes();
-      final filename = p.basename(localPath); // <bookId>.<ext>
-      encoder.addArchiveFile(ArchiveFile('covers/$filename', bytes.length, bytes));
-    }
+    await addLocalCoverImagesToZip(encoder, allBooks);
 
     encoder.close();
     return File(zipPath);
@@ -158,56 +240,7 @@ class LibraryTransferService {
   /// EXPORT JSON (contenu BDD seul, sans couvertures)
   /// ----------------------------
   Future<File> exportToJsonFile() async {
-    final allSeries = await db.getAllSeries();
-    final allBooks = await db.getAllBooks();
-
-    final allCopies = <Copy>[];
-    for (final b in allBooks) {
-      final cs = await db.getCopiesByBook(b.id);
-      allCopies.addAll(cs);
-    }
-
-    final payload = ExportLibrary(
-      version: 2,
-      exportedAt: DateTime.now(),
-      series: allSeries
-          .map((s) => ExportSeries(
-                id: s.id,
-                name: s.name,
-                expectedVolumes: s.expectedVolumes,
-                tags: s.tags,
-                updatedAt: s.updatedAt,
-              ))
-          .toList(),
-      books: allBooks
-          .map((b) => ExportBook(
-                id: b.id,
-                isbn: b.isbn,
-                title: b.title,
-                seriesId: b.seriesId,
-                volumeNumber: b.volumeNumber,
-                authors: b.authors,
-                publisher: b.publisher,
-                publishedDate: b.publishedDate,
-                coverUrl: b.coverUrl,
-                tags: b.tags,
-                summary: b.summary,
-                updatedAt: b.updatedAt,
-              ))
-          .toList(),
-      copies: allCopies
-          .map((c) => ExportCopy(
-                id: c.id,
-                bookId: c.bookId,
-                rating: c.rating,
-                review: c.review,
-                condition: c.condition,
-                location: c.location,
-                notes: c.notes,
-                updatedAt: c.updatedAt,
-              ))
-          .toList(),
-    );
+    final payload = await buildExportLibraryPayload();
 
     final tmp = await getTemporaryDirectory();
     final jsonPath = p.join(tmp.path, 'bd_library_export.json');
@@ -371,6 +404,11 @@ class LibraryTransferService {
       conflicts: conflicts,
       copiesToUpsert: copiesToUpsert,
       importedWorkIdToLocalWorkId: importedWorkIdToLocalWorkId,
+      shelvesToUpsert: lib.shelves,
+      bookShelfLinks: lib.bookShelves,
+      readingProgressToUpsert: lib.readingProgress,
+      readingSessionsToUpsert: lib.readingSessions,
+      readingGoalsToUpsert: lib.readingGoals,
     );
   }
 
@@ -381,6 +419,8 @@ class LibraryTransferService {
     required File zipFile,
     required ImportPlan plan,
   }) async {
+    await db.ensureDefaultUnclassifiedShelfExists();
+
     // 1) upsert series (dernière modif gagne)
     for (final s in plan.seriesToUpsert) {
       final existing = await db.getSeriesById(s.id);
@@ -394,6 +434,8 @@ class LibraryTransferService {
         ));
       }
     }
+
+    await _applyImportShelves(plan);
 
     // 2) create works (books)
     for (final b in plan.booksToCreate) {
@@ -496,11 +538,16 @@ class LibraryTransferService {
     await _linkCoversToBooks();
 
     await _applyImportPlanCopies(plan);
+    await _applyImportBookShelves(plan);
+    await _applyImportReading(plan);
+    await db.assignDefaultShelfToBooksWithoutShelves();
   }
 
   /// Applique un plan d'import sans fichier ZIP (JSON seul : pas d'extraction de couvertures).
   /// Complète la base existante (séries, livres, exemplaires).
   Future<void> applyImportPlanFromJson(ImportPlan plan) async {
+    await db.ensureDefaultUnclassifiedShelfExists();
+
     // 1) upsert series (dernière modif gagne)
     for (final s in plan.seriesToUpsert) {
       final existing = await db.getSeriesById(s.id);
@@ -514,6 +561,8 @@ class LibraryTransferService {
         ));
       }
     }
+
+    await _applyImportShelves(plan);
 
     // 2) create works (books)
     for (final b in plan.booksToCreate) {
@@ -606,6 +655,83 @@ class LibraryTransferService {
 
     // 5) upsert copies (rating/review au niveau exemplaire)
     await _applyImportPlanCopies(plan);
+    await _applyImportBookShelves(plan);
+    await _applyImportReading(plan);
+    await db.assignDefaultShelfToBooksWithoutShelves();
+  }
+
+  Future<void> _applyImportShelves(ImportPlan plan) async {
+    for (final s in plan.shelvesToUpsert) {
+      final existing = await db.getShelfById(s.id);
+      if (existing == null || s.updatedAt.isAfter(existing.updatedAt)) {
+        await db.upsertShelf(ShelvesCompanion.insert(
+          id: s.id,
+          name: s.name,
+          color: Value(s.color),
+          sortOrder: Value(s.sortOrder),
+          updatedAt: s.updatedAt,
+        ));
+      }
+    }
+  }
+
+  Future<void> _applyImportBookShelves(ImportPlan plan) async {
+    final byBook = <String, Set<String>>{};
+    for (final link in plan.bookShelfLinks) {
+      final localBookId =
+          plan.importedWorkIdToLocalWorkId[link.bookId] ?? link.bookId;
+      if (await db.getBookById(localBookId) == null) continue;
+      if (await db.getShelfById(link.shelfId) == null) continue;
+      byBook.putIfAbsent(localBookId, () => <String>{});
+      byBook[localBookId]!.add(link.shelfId);
+    }
+    for (final entry in byBook.entries) {
+      await db.setBookShelves(entry.key, entry.value.toList());
+    }
+  }
+
+  Future<void> _applyImportReading(ImportPlan plan) async {
+    for (final r in plan.readingProgressToUpsert) {
+      final bookId =
+          plan.importedWorkIdToLocalWorkId[r.bookId] ?? r.bookId;
+      if (await db.getBookById(bookId) == null) continue;
+      await db.upsertReadingProgress(ReadingProgressCompanion.insert(
+        bookId: bookId,
+        status: Value(r.status),
+        currentPage: Value(r.currentPage),
+        totalPages: Value(r.totalPages),
+        usePercentage: Value(r.usePercentage),
+        progressPercent: Value(r.progressPercent),
+        readingStartedAt: Value(r.readingStartedAt),
+        readingFinishedAt: Value(r.readingFinishedAt),
+      ));
+    }
+
+    for (final s in plan.readingSessionsToUpsert) {
+      final bookId =
+          plan.importedWorkIdToLocalWorkId[s.bookId] ?? s.bookId;
+      if (await db.getBookById(bookId) == null) continue;
+      await db.into(db.readingSessions).insertOnConflictUpdate(
+            ReadingSessionsCompanion.insert(
+              id: s.id,
+              bookId: bookId,
+              startedAt: s.startedAt,
+              endedAt: Value(s.endedAt),
+              startPage: Value(s.startPage),
+              endPage: Value(s.endPage),
+              durationSeconds: Value(s.durationSeconds),
+              finishedBook: Value(s.finishedBook),
+            ),
+          );
+    }
+
+    for (final g in plan.readingGoalsToUpsert) {
+      await db.upsertReadingGoals(ReadingGoalsCompanion.insert(
+        id: g.id,
+        booksPerMonth: Value(g.booksPerMonth),
+        booksPerYear: Value(g.booksPerYear),
+      ));
+    }
   }
 
   Future<void> _applyImportPlanCopies(ImportPlan plan) async {
