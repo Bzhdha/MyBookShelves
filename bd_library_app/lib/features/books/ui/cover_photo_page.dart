@@ -346,28 +346,18 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
                 color: Theme.of(context).colorScheme.surface,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Ajustez les bords du cadre avec les poignées, puis validez.',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: 8),
-                      FilledButton(
-                        onPressed: _isProcessing ? null : _confirmCrop,
-                        child: _isProcessing
-                            ? SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Theme.of(context).colorScheme.onPrimary,
-                                ),
-                              )
-                            : const Text('Valider le recadrage'),
-                      ),
-                    ],
+                  child: FilledButton(
+                    onPressed: _isProcessing ? null : _confirmCrop,
+                    child: _isProcessing
+                        ? SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Theme.of(context).colorScheme.onPrimary,
+                            ),
+                          )
+                        : const Text('Valider le recadrage'),
                   ),
                 ),
               ),
