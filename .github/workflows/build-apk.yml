@@ -12,6 +12,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Aligné sur l’image ubuntu-latest (SDK préinstallé) pour le cache CMake / NDK.
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     defaults:
       run:
         working-directory: bd_library_app
@@ -49,6 +52,18 @@ jobs:
             ~/.gradle/wrapper
           key: gradle-${{ hashFiles('bd_library_app/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('bd_library_app/android/**/*.gradle*') }}
           restore-keys: gradle-
+
+      # Évite de retélécharger / réinstaller CMake (et le NDK) à chaque run : requis par
+      # plusieurs plugins natifs (camera, ML Kit, etc.), absent du SDK minimal du runner.
+      - name: Cache Android SDK (CMake, NDK)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ANDROID_SDK_ROOT }}/cmake
+            ${{ env.ANDROID_SDK_ROOT }}/ndk
+          key: ${{ runner.os }}-android-ndk-cmake-${{ hashFiles('bd_library_app/android/**/*.gradle.kts', 'bd_library_app/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-android-ndk-cmake-
 
       - name: Get dependencies
         run: flutter pub get
