@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html_parser;
 import '../../../core/app_logger.dart';
@@ -20,7 +21,7 @@ class OpenLibraryProvider {
         return null;
       }
 
-      final doc = html_parser.parse(response.body);
+      final doc = html_parser.parse(utf8.decode(response.bodyBytes));
 
       // Helper: récupère le <td> (texte) à partir d'un label de <th>
       String? tdTextFor(String thLabel) {
