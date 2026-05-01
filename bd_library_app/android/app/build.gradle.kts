@@ -62,17 +62,6 @@ android {
         }
     }
 
-    // ABI splits: Play Store receives a universal bundle (no effect on AAB).
-    // For release APK builds, splits drastically cut native compilation time.
-    // Override at CLI with: flutter build apk --target-platform android-arm64
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "armeabi-v7a")
-            isUniversalApk = false
-        }
-    }
 }
 
 flutter {
