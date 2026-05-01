@@ -18,6 +18,7 @@ class _AddBookPageState extends State<AddBookPage> {
   final _authorsCtrl = TextEditingController();
   final _publisherCtrl = TextEditingController();
   final _publishedDateCtrl = TextEditingController();
+  final _seriesNameCtrl = TextEditingController();
 
   bool _loadingIsbn = false;
 
@@ -57,6 +58,11 @@ class _AddBookPageState extends State<AddBookPage> {
         if (_publishedDateCtrl.text.trim().isEmpty &&
             meta.publishedDate != null) {
           _publishedDateCtrl.text = meta.publishedDate!;
+        }
+        if (_seriesNameCtrl.text.trim().isEmpty &&
+            meta.seriesTitle != null &&
+            meta.seriesTitle!.trim().isNotEmpty) {
+          _seriesNameCtrl.text = meta.seriesTitle!.trim();
         }
 
         // Si tu veux aussi stocker la coverUrl, on la gardera lors du save
@@ -129,6 +135,13 @@ class _AddBookPageState extends State<AddBookPage> {
               controller: _publishedDateCtrl,
               decoration: const InputDecoration(labelText: "Date de publication"),
             ),
+            TextField(
+              controller: _seriesNameCtrl,
+              decoration: const InputDecoration(
+                labelText: "Série",
+                hintText: "Optionnel — regroupe les tomes",
+              ),
+            ),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () async {
@@ -141,6 +154,9 @@ class _AddBookPageState extends State<AddBookPage> {
                   publisher: _publisherCtrl.text,
                   publishedDate: _publishedDateCtrl.text,
                   coverUrl: _lastCoverUrl,
+                  seriesName: _seriesNameCtrl.text.trim().isEmpty
+                      ? null
+                      : _seriesNameCtrl.text.trim(),
                 );
 
                 if (mounted) Navigator.pop(context);

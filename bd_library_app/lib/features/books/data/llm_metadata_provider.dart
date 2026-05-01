@@ -22,6 +22,7 @@ Fournis le résultat au format JSON strict avec les champs suivants (si disponib
 - "auteurs" : une liste des auteurs/scénaristes/dessinateurs,
 - "éditeur" : le nom de l'éditeur,
 - "collection" : le nom de la collection (si applicable),
+- "série" : le nom de la série ou du cycle regroupant plusieurs tomes (si applicable),
 - "type" : "BD", "Manga", "Manhua", "Roman", etc.,
 - "tome" : le numéro du tome (si applicable),
 - "date_parution" : la date de parution (format AAAA-MM-JJ),
@@ -77,6 +78,15 @@ BdMetadata? parseLlmMetadataJsonFromFrench(Map<String, dynamic> meta) {
     description = resume.toString().trim();
   }
 
+  String? seriesTitle;
+  for (final key in ['série', 'serie', 'collection']) {
+    final v = meta[key];
+    if (v != null && v.toString().trim().isNotEmpty) {
+      seriesTitle = v.toString().trim();
+      break;
+    }
+  }
+
   return BdMetadata(
     title: title,
     authors: authors,
@@ -84,6 +94,7 @@ BdMetadata? parseLlmMetadataJsonFromFrench(Map<String, dynamic> meta) {
     publishedDate: publishedDate,
     description: description,
     volumeNumber: volumeNumber,
+    seriesTitle: seriesTitle,
   );
 }
 
@@ -131,6 +142,15 @@ BdMetadata? parseLlmMetadataJson(Map<String, dynamic> meta) {
     description = desc.toString().trim();
   }
 
+  String? seriesTitle;
+  for (final key in ['seriesTitle', 'series', 'collection']) {
+    final v = meta[key];
+    if (v != null && v.toString().trim().isNotEmpty) {
+      seriesTitle = v.toString().trim();
+      break;
+    }
+  }
+
   return BdMetadata(
     title: title,
     authors: authors,
@@ -138,5 +158,6 @@ BdMetadata? parseLlmMetadataJson(Map<String, dynamic> meta) {
     publishedDate: publishedDate,
     description: description,
     volumeNumber: volumeNumber,
+    seriesTitle: seriesTitle,
   );
 }

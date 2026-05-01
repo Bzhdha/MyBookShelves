@@ -152,6 +152,9 @@ class _MetadataSearchSheetState extends State<MetadataSearchSheet> {
       summary: (meta.description?.trim().isNotEmpty == true)
           ? meta.description!.trim()
           : null,
+      seriesNameOverride: meta.seriesTitle?.trim().isNotEmpty == true
+          ? meta.seriesTitle!.trim()
+          : null,
     );
     if (!mounted) return;
     Navigator.pop(context, true);
@@ -303,6 +306,7 @@ class _ResultSummary extends StatelessWidget {
       if (meta.authors != null && meta.authors!.isNotEmpty) 'Auteurs: ${meta.authors!.join(", ")}',
       if (meta.publisher != null && meta.publisher!.isNotEmpty) 'Éditeur: ${meta.publisher}',
       if (meta.publishedDate != null && meta.publishedDate!.isNotEmpty) 'Date: ${meta.publishedDate}',
+      if (meta.seriesTitle != null && meta.seriesTitle!.isNotEmpty) 'Série: ${meta.seriesTitle}',
       if (meta.volumeNumber != null && meta.volumeNumber!.isNotEmpty) 'Tome: ${meta.volumeNumber}',
     ];
     return Column(

@@ -24,6 +24,7 @@ class _EditBookPageState extends State<EditBookPage> {
   late final TextEditingController _publisherCtrl;
   late final TextEditingController _publishedDateCtrl;
   late final TextEditingController _volumeNumberCtrl;
+  late final TextEditingController _seriesNameCtrl;
   late final TextEditingController _summaryCtrl;
   late final TextEditingController _promptCtrl;
 
@@ -46,6 +47,7 @@ class _EditBookPageState extends State<EditBookPage> {
     _volumeNumberCtrl = TextEditingController(
       text: b.volumeNumber != null ? b.volumeNumber.toString() : '',
     );
+    _seriesNameCtrl = TextEditingController();
     _summaryCtrl = TextEditingController(text: b.summary);
     final defaultPrompt = llmIsbnSearchUserPromptTemplate.replaceAll(
       '[INSÉRER_ISBN_ICI]',
@@ -53,6 +55,15 @@ class _EditBookPageState extends State<EditBookPage> {
     );
     _promptCtrl = TextEditingController(text: defaultPrompt);
     _speechSummary.initialize();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _hydrateSeriesField());
+  }
+
+  Future<void> _hydrateSeriesField() async {
+    final svc = context.read<BookService>();
+    final name = await svc.getSeriesNameForBookId(widget.book.seriesId);
+    if (mounted) {
+      _seriesNameCtrl.text = name ?? '';
+    }
   }
 
   @override
@@ -63,6 +74,7 @@ class _EditBookPageState extends State<EditBookPage> {
     _publisherCtrl.dispose();
     _publishedDateCtrl.dispose();
     _volumeNumberCtrl.dispose();
+    _seriesNameCtrl.dispose();
     _summaryCtrl.dispose();
     _promptCtrl.dispose();
     super.dispose();
@@ -153,6 +165,9 @@ class _EditBookPageState extends State<EditBookPage> {
     if (meta.volumeNumber != null && meta.volumeNumber!.trim().isNotEmpty) {
       _volumeNumberCtrl.text = meta.volumeNumber!.trim();
     }
+    if (meta.seriesTitle != null && meta.seriesTitle!.trim().isNotEmpty) {
+      _seriesNameCtrl.text = meta.seriesTitle!.trim();
+    }
     if (meta.description != null && meta.description!.trim().isNotEmpty) {
       _summaryCtrl.text = meta.description!.trim();
     }
@@ -181,6 +196,7 @@ class _EditBookPageState extends State<EditBookPage> {
       publishedDate: _publishedDateCtrl.text.trim().isEmpty ? null : _publishedDateCtrl.text.trim(),
       volumeNumber: volumeNumber,
       summary: _summaryCtrl.text.trim(),
+      seriesNameOverride: _seriesNameCtrl.text.trim(),
     );
     if (!mounted) return;
     Navigator.pop(context, true);
@@ -238,6 +254,15 @@ class _EditBookPageState extends State<EditBookPage> {
             controller: _publishedDateCtrl,
             decoration: const InputDecoration(
               labelText: 'Date de publication',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _seriesNameCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Série',
+              hintText: 'Même nom pour tous les tomes d\'une série',
               border: OutlineInputBorder(),
             ),
           ),

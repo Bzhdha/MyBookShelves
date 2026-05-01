@@ -119,6 +119,8 @@ class MetadataService {
       coverUrl: _pickString(bd?.coverUrl, ol?.coverUrl),
 
       volumeNumber: _pickString(bd?.volumeNumber, ol?.volumeNumber),
+
+      seriesTitle: _pickString(bd?.seriesTitle, ol?.seriesTitle),
     );
   }
 

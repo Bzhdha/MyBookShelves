@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' hide Column;
 import 'package:uuid/uuid.dart';
 
 import '../data/books_repository.dart';
+import '../../shelves/data/shelves_repository.dart';
 import '../data/metadata_service.dart';
 import '../data/cover_cache_service.dart';
 import '../../../core/app_logger.dart';
@@ -11,12 +12,19 @@ import '../../../db/app_db.dart';
 
 class BookService {
   final BooksRepository _repo;
+  final ShelvesRepository _shelvesRepo;
   final MetadataService _metadata;
   final CoverCacheService _covers;
   final AppLogger? _logger;
   final _uuid = const Uuid();
 
-  BookService(this._repo, this._metadata, this._covers, [this._logger]);
+  BookService(
+    this._repo,
+    this._shelvesRepo,
+    this._metadata,
+    this._covers, [
+    this._logger,
+  ]);
 
   /// Flux de tous les livres.
   Stream<List<Book>> watchAllBooks() => _repo.watchAllBooks();
@@ -31,6 +39,37 @@ class BookService {
     return _repo.getBookById(id);
   }
   Future<List<Copy>> getCopies(String bookId) => _repo.getCopiesByBook(bookId);
+
+  /// Nom affiché de la série, ou null.
+  Future<String?> getSeriesNameForBookId(String? seriesId) async {
+    if (seriesId == null) return null;
+    final s = await _repo.getSeriesById(seriesId);
+    return s?.name;
+  }
+
+  /// Autres tomes de la même série (hors ce livre), triés par [Book.volumeNumber].
+  Future<List<Book>> getSiblingBooksInSeries(String bookId) async {
+    final b = await _repo.getBookById(bookId);
+    if (b?.seriesId == null) return [];
+    final all = await _repo.getBooksBySeries(b!.seriesId!);
+    return all.where((x) => x.id != bookId).toList();
+  }
+
+  Future<String?> _seriesIdForDisplayName(String? raw) async {
+    final t = raw?.trim() ?? '';
+    if (t.isEmpty) return null;
+    final existing = await _repo.findSeriesByNameInsensitive(t);
+    if (existing != null) return existing.id;
+    final id = _uuid.v4();
+    await _repo.upsertSeries(
+      SeriesCompanion.insert(
+        id: id,
+        name: t,
+        updatedAt: DateTime.now(),
+      ),
+    );
+    return id;
+  }
 
   /// Recherche par titre, auteur ou ISBN (même partiel). Retourne les livres avec le nom de série.
   Future<List<(Book, String?)>> searchBooksWithSeriesNames(String query) async {
@@ -68,6 +107,7 @@ class BookService {
     String? publisher,
     String? publishedDate,
     String? coverUrl,
+    String? seriesName,
   }) async {
     _logger?.log('BookService.addBookManually', {
       'isbn': isbn,
@@ -75,12 +115,14 @@ class BookService {
       'authors': authors,
     });
     final id = _uuid.v4();
+    final seriesId = await _seriesIdForDisplayName(seriesName);
 
     await _repo.upsertBook(
       BooksCompanion.insert(
         id: id,
         isbn: Value(isbn?.trim().isEmpty ?? true ? null : isbn!.trim()),
         title: title,
+        seriesId: Value(seriesId),
         authors: Value(authors),
         publisher: Value(
           publisher?.trim().isNotEmpty == true ? publisher!.trim() : null,
@@ -92,6 +134,7 @@ class BookService {
         updatedAt: DateTime.now(),
       ),
     );
+    await _shelvesRepo.setBookShelves(id, []);
   }
 
   /// Ajout ou enrichissement via scan ISBN, puis création d'un exemplaire.
@@ -129,11 +172,14 @@ class BookService {
           ? meta!.description!.trim()
           : '';
 
+      final seriesId = await _seriesIdForDisplayName(meta?.seriesTitle);
+
       await _repo.upsertBook(
         BooksCompanion.insert(
           id: newBookId,
           isbn: Value(isbn),
           title: title,
+          seriesId: Value(seriesId),
           authors: Value(authorsCsv),
           publisher: Value(meta?.publisher),
           publishedDate: Value(meta?.publishedDate),
@@ -145,6 +191,7 @@ class BookService {
         ),
       );
 
+      await _shelvesRepo.setBookShelves(newBookId, []);
       bookId = newBookId;
     } else {
       final existing = works.first;
@@ -198,11 +245,15 @@ class BookService {
                   ? meta.description!.trim()
                   : existing.summary);
 
+          final newSeriesId = existing.seriesId ??
+              await _seriesIdForDisplayName(meta.seriesTitle);
+
           await _repo.upsertBook(
             BooksCompanion(
               id: Value(bookId),
               isbn: Value(isbn),
               title: Value(newTitle),
+              seriesId: Value(newSeriesId),
               authors: Value(newAuthors),
               publisher: Value(
                 existing.publisher?.trim().isNotEmpty == true
@@ -245,6 +296,8 @@ class BookService {
   }
 
   /// Met à jour les champs métadonnées d'un livre (titre, auteurs, isbn, etc.).
+  /// [seriesNameOverride] : si non null, met à jour le lien vers une série (nom affiché) ;
+  /// chaîne vide après trim = retirer le livre de toute série. Si null, le lien série est inchangé.
   Future<void> updateBookDetails(
     String id, {
     String? title,
@@ -254,16 +307,23 @@ class BookService {
     String? publishedDate,
     int? volumeNumber,
     String? summary,
+    String? seriesNameOverride,
   }) async {
     _logger?.log('BookService.updateBookDetails', {'id': id});
     final existing = await _repo.getBookById(id);
     if (existing == null) return;
+
+    String? newSeriesId = existing.seriesId;
+    if (seriesNameOverride != null) {
+      newSeriesId = await _seriesIdForDisplayName(seriesNameOverride.trim());
+    }
+
     await _repo.upsertBook(
       BooksCompanion(
         id: Value(id),
         isbn: Value(isbn ?? existing.isbn),
         title: Value(title ?? existing.title),
-        seriesId: Value(existing.seriesId),
+        seriesId: Value(newSeriesId),
         volumeNumber: Value(volumeNumber ?? existing.volumeNumber),
         authors: Value(authors ?? existing.authors),
         publisher: Value(publisher ?? existing.publisher),
