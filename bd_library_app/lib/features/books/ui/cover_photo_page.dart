@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -38,6 +39,7 @@ class CoverPhotoPage extends StatefulWidget {
 class _CoverPhotoPageState extends State<CoverPhotoPage> {
   CameraController? _controller;
   bool _isProcessing = false;
+  bool _torchOn = false;
   String? _error;
   late bool _phaseCover;
 
@@ -57,6 +59,10 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
 
   @override
   void dispose() {
+    final c = _controller;
+    if (c != null && c.value.isInitialized) {
+      unawaited(c.setFlashMode(FlashMode.off));
+    }
     _controller?.dispose();
     super.dispose();
   }
@@ -69,8 +75,15 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
         setState(() => _error = 'Aucune caméra disponible');
         return;
       }
+      CameraDescription selected = cameras.first;
+      for (final c in cameras) {
+        if (c.lensDirection == CameraLensDirection.back) {
+          selected = c;
+          break;
+        }
+      }
       final controller = CameraController(
-        cameras.first,
+        selected,
         ResolutionPreset.high,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
@@ -78,6 +91,7 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
       if (!mounted) return;
       setState(() {
         _controller = controller;
+        _torchOn = false;
         _error = null;
       });
     } catch (e) {
@@ -92,6 +106,12 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
       final xFile = await _controller!.takePicture();
       final bytes = await File(xFile.path).readAsBytes();
       final decoded = _decodeImageSize(bytes);
+      if (_torchOn && _controller!.value.isInitialized) {
+        try {
+          await _controller!.setFlashMode(FlashMode.off);
+        } catch (_) {}
+        _torchOn = false;
+      }
       if (!mounted) return;
       setState(() {
         _capturedImage = bytes;
@@ -201,6 +221,26 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
     });
   }
 
+  Future<void> _toggleTorch() async {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized || _capturedImage != null) return;
+    try {
+      if (_torchOn) {
+        await c.setFlashMode(FlashMode.off);
+        if (mounted) setState(() => _torchOn = false);
+      } else {
+        await c.setFlashMode(FlashMode.torch);
+        if (mounted) setState(() => _torchOn = true);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Flash non disponible sur cet appareil')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_error != null) {
@@ -225,11 +265,20 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
   Widget _buildCameraScreen() {
     final phaseLabel = _phaseCover ? 'Couverture' : 'Dos du livre';
     return Scaffold(
-      backgroundColor: Colors.black,
       appBar: AppBar(
         title: Text(phaseLabel),
-        backgroundColor: Colors.black87,
-        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: Icon(_torchOn ? Icons.flash_on : Icons.flash_off),
+            onPressed: _isProcessing ? null : _toggleTorch,
+            tooltip: 'Flash',
+          ),
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: _isProcessing ? null : () => Navigator.pop(context),
+            tooltip: 'Sortir',
+          ),
+        ],
       ),
       body: Stack(
         fit: StackFit.expand,
@@ -244,20 +293,6 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
               ),
             ),
           ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Center(
-                child: Container(
-                  width: 220,
-                  height: 300,
-                  decoration: BoxDecoration(
-                    border: Border.all(width: 3, color: Colors.white),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-            ),
-          ),
           Positioned(
             left: 0,
             right: 0,
@@ -268,10 +303,13 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
                 child: FilledButton(
                   onPressed: _isProcessing ? null : _takePicture,
                   child: _isProcessing
-                      ? const SizedBox(
+                      ? SizedBox(
                           height: 24,
                           width: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
                         )
                       : const Text('Prendre la photo'),
                 ),
@@ -285,11 +323,8 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
 
   Widget _buildCropScreen() {
     return Scaffold(
-      backgroundColor: Colors.black,
       appBar: AppBar(
         title: Text(_phaseCover ? 'Recadrer la couverture' : 'Recadrer le dos'),
-        backgroundColor: Colors.black87,
-        foregroundColor: Colors.white,
         actions: [
           TextButton(
             onPressed: _isProcessing ? null : _cancelCrop,
@@ -306,27 +341,34 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
             right: 0,
             bottom: 0,
             child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Ajustez les bords du cadre avec les poignées, puis validez.',
-                      style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12),
-                    ),
-                    const SizedBox(height: 8),
-                    FilledButton(
-                      onPressed: _isProcessing ? null : _confirmCrop,
-                      child: _isProcessing
-                          ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Valider le recadrage'),
-                    ),
-                  ],
+              child: Material(
+                elevation: 6,
+                color: Theme.of(context).colorScheme.surface,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Ajustez les bords du cadre avec les poignées, puis validez.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      FilledButton(
+                        onPressed: _isProcessing ? null : _confirmCrop,
+                        child: _isProcessing
+                            ? SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Theme.of(context).colorScheme.onPrimary,
+                                ),
+                              )
+                            : const Text('Valider le recadrage'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
