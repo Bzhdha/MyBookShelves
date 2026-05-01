@@ -29,7 +29,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.41.4'
+          flutter-version: '3.41.8'
           channel: 'stable'
           cache: true
 
@@ -47,8 +47,11 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ hashFiles('bd_library_app/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('bd_library_app/android/**/*.gradle*') }}
-          restore-keys: gradle-
+            ~/.gradle/caches/build-cache-1
+          key: gradle-${{ hashFiles('bd_library_app/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('bd_library_app/android/**/*.gradle*') }}-${{ hashFiles('bd_library_app/pubspec.lock') }}
+          restore-keys: |
+            gradle-${{ hashFiles('bd_library_app/android/gradle/wrapper/gradle-wrapper.properties') }}-
+            gradle-
 
       - name: Get dependencies
         run: flutter pub get
@@ -67,7 +70,10 @@ jobs:
           echo "storeFile=bdlibrary.jks" >> android/key.properties
 
       - name: Build APK (split per ABI)
-        run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=.debug-info/
+        env:
+          # No daemon in CI: containers are ephemeral, daemon lifecycle adds overhead
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+        run: flutter build apk --release --split-per-abi --no-pub --obfuscate --split-debug-info=.debug-info/
 
       - name: Upload APKs
         uses: actions/upload-artifact@v4
