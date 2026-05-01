@@ -9,11 +9,11 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   provider: ^6.1.2
-  drift: ^2.22.1
+  drift: ^2.32.1
   drift_flutter: ^0.3.0
   archive: ^4.0.9
   file_picker: ^11.0.2
-  share_plus: ^12.0.1
+  share_plus: ^12.0.2
   path_provider: ^2.1.4
   shared_preferences: ^2.2.3
   flutter_secure_storage: ^10.0.0
@@ -31,7 +31,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  drift_dev: ^2.22.1
+  drift_dev: ^2.32.1
   build_runner: ^2.4.13
   flutter_lints: ^6.0.0
 flutter:
