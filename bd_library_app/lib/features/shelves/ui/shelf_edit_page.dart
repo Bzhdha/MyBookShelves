@@ -54,7 +54,8 @@ class _ShelfEditPageState extends State<ShelfEditPage> {
       appBar: AppBar(
         title: Text(isEdit ? 'Modifier l\'étagère' : 'Nouvelle étagère'),
         actions: [
-          if (isEdit)
+          if (isEdit &&
+              widget.shelf!.id != DefaultUnclassifiedShelf.id)
             IconButton(
               icon: const Icon(Icons.delete_outline),
               tooltip: 'Supprimer',
@@ -204,12 +205,23 @@ class _ShelfEditPageState extends State<ShelfEditPage> {
     );
     if (ok != true || widget.shelf == null || !context.mounted) return;
     setState(() => _saving = true);
-    await context.read<ShelfService>().deleteShelf(widget.shelf!.id);
+    final deleted =
+        await context.read<ShelfService>().deleteShelf(widget.shelf!.id);
     if (context.mounted) {
-      Navigator.pop(context, true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Étagère supprimée')),
-      );
+      if (deleted) {
+        Navigator.pop(context, true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Étagère supprimée')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'L\'étagère « ${DefaultUnclassifiedShelf.name} » ne peut pas être supprimée.',
+            ),
+          ),
+        );
+      }
     }
     if (mounted) setState(() => _saving = false);
   }

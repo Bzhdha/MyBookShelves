@@ -104,11 +104,12 @@ class ShelvesPage extends StatelessWidget {
               title: const Text('Modifier'),
               onTap: () => Navigator.pop(context, 'edit'),
             ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Supprimer', style: TextStyle(color: Colors.red)),
-              onTap: () => Navigator.pop(context, 'delete'),
-            ),
+            if (shelf.id != DefaultUnclassifiedShelf.id)
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+                onTap: () => Navigator.pop(context, 'delete'),
+              ),
           ],
         ),
       ),
@@ -142,10 +143,16 @@ class ShelvesPage extends StatelessWidget {
         ),
       );
       if (confirm == true && context.mounted) {
-        await context.read<ShelfService>().deleteShelf(shelf.id);
+        final ok = await context.read<ShelfService>().deleteShelf(shelf.id);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Étagère supprimée')),
+            SnackBar(
+              content: Text(
+                ok
+                    ? 'Étagère supprimée'
+                    : 'L\'étagère « ${DefaultUnclassifiedShelf.name} » ne peut pas être supprimée.',
+              ),
+            ),
           );
         }
       }
@@ -209,11 +216,18 @@ class _ShelfBooksPage extends StatelessWidget {
                   ),
                 );
                 if (confirm == true && context.mounted) {
-                  await context.read<ShelfService>().deleteShelf(shelf.id);
+                  final ok =
+                      await context.read<ShelfService>().deleteShelf(shelf.id);
                   if (context.mounted) {
-                    Navigator.pop(context);
+                    if (ok) Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Étagère supprimée')),
+                      SnackBar(
+                        content: Text(
+                          ok
+                              ? 'Étagère supprimée'
+                              : 'L\'étagère « ${DefaultUnclassifiedShelf.name} » ne peut pas être supprimée.',
+                        ),
+                      ),
                     );
                   }
                 }
@@ -221,10 +235,11 @@ class _ShelfBooksPage extends StatelessWidget {
             },
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'edit', child: Text('Modifier l\'étagère')),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Text('Supprimer l\'étagère', style: TextStyle(color: Colors.red)),
-              ),
+              if (shelf.id != DefaultUnclassifiedShelf.id)
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Supprimer l\'étagère', style: TextStyle(color: Colors.red)),
+                ),
             ],
           ),
         ],

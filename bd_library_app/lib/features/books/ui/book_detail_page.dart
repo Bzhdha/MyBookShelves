@@ -7,7 +7,6 @@ import 'package:provider/provider.dart';
 import '../../../db/app_db.dart';
 import '../data/cover_cache_service.dart';
 import '../domain/book_service.dart';
-import '../../../db/app_db.dart';
 import '../../shelves/domain/shelf_service.dart';
 import '../../users/domain/active_user_store.dart';
 import 'copy_form_page.dart';
