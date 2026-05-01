@@ -44,6 +44,9 @@ class BooksRepository {
   /// Suppression d'un exemplaire.
   Future<void> deleteCopyById(String id) => _db.deleteCopyById(id);
 
+  /// Compte le nombre d'exemplaires pour un livre.
+  Future<int> countCopiesForBook(String bookId) => _db.countCopiesForBook(bookId);
+
   /// Recherche d'œuvres par ISBN.
   Future<List<Book>> findWorksByIsbn(String isbn) =>
       _db.findWorksByIsbn(isbn);

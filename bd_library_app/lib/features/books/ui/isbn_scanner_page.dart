@@ -9,6 +9,7 @@ import '../domain/book_service.dart';
 import '../../settings/data/scan_settings_store.dart';
 import '../../settings/ui/scan_settings_page.dart';
 import 'cover_photo_page.dart';
+import 'book_detail_page.dart';
 
 class IsbnScannerPage extends StatefulWidget {
   const IsbnScannerPage({
@@ -86,6 +87,40 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
       if (!mounted) return;
       Navigator.pop<String>(context, isbn);
       return;
+    }
+
+    final existing = await bookService.findExistingByIsbn(isbn);
+    if (existing != null && mounted) {
+      final copies = await bookService.countCopies(existing.id);
+      final action = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Livre déjà présent'),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('« ${existing.title} »', style: const TextStyle(fontWeight: FontWeight.bold)),
+            if (existing.authors.isNotEmpty) Text(existing.authors),
+            const SizedBox(height: 8),
+            Text('Vous possédez déjà $copies exemplaire${copies > 1 ? 's' : ''}.'),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, 'cancel'), child: const Text('Annuler')),
+            TextButton(onPressed: () => Navigator.pop(ctx, 'view'), child: const Text('Voir')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, 'add'), child: const Text('Ajouter quand même')),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (action == 'cancel' || action == null) {
+        setState(() => _pendingIsbn = null);
+        await _controller.start();
+        return;
+      }
+      if (action == 'view') {
+        setState(() => _pendingIsbn = null);
+        await Navigator.push(context, MaterialPageRoute(builder: (_) => BookDetailPage(bookId: existing.id)));
+        _resumeScannerAfterReturn();
+        return;
+      }
     }
 
     final bookId = await bookService.addOrUpdateFromIsbnScan(isbn);

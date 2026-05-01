@@ -71,6 +71,15 @@ class BookService {
     return id;
   }
 
+  /// Vérifie si un ISBN existe déjà dans la collection.
+  Future<Book?> findExistingByIsbn(String isbn) async {
+    final works = await _repo.findWorksByIsbn(isbn);
+    return works.isNotEmpty ? works.first : null;
+  }
+
+  /// Compte le nombre d'exemplaires pour un livre.
+  Future<int> countCopies(String bookId) => _repo.countCopiesForBook(bookId);
+
   /// Recherche par titre, auteur ou ISBN (même partiel). Retourne les livres avec le nom de série.
   Future<List<(Book, String?)>> searchBooksWithSeriesNames(String query) async {
     _logger?.log('BookService.searchBooksWithSeriesNames', {'query': query});
