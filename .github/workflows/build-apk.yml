@@ -53,6 +53,9 @@ jobs:
             gradle-${{ hashFiles('bd_library_app/android/gradle/wrapper/gradle-wrapper.properties') }}-
             gradle-
 
+      - name: Install CMake for NDK builds
+        run: yes | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager "cmake;3.22.1"
+
       - name: Get dependencies
         run: flutter pub get
 
@@ -69,17 +72,17 @@ jobs:
           echo "keyAlias=$KEY_ALIAS" >> android/key.properties
           echo "storeFile=bdlibrary.jks" >> android/key.properties
 
-      - name: Build APK (split per ABI)
+      - name: Build APK (arm64 only)
         env:
           # No daemon in CI: containers are ephemeral, daemon lifecycle adds overhead
           GRADLE_OPTS: "-Dorg.gradle.daemon=false"
-        run: flutter build apk --release --split-per-abi --no-pub --obfuscate --split-debug-info=.debug-info/
+        run: flutter build apk --release --target-platform android-arm64 --no-pub --obfuscate --split-debug-info=.debug-info/
 
-      - name: Upload APKs
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apks
-          path: bd_library_app/build/app/outputs/flutter-apk/*.apk
+          name: app-release-arm64
+          path: bd_library_app/build/app/outputs/flutter-apk/app-release.apk
 
       - name: Upload debug symbols
         uses: actions/upload-artifact@v4
