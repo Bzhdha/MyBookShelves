@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -36,19 +37,22 @@ const NewHomePage({super.key});
 class _NHPState extends State<NewHomePage> with WidgetsBindingObserver{
 final _sc=TextEditingController();String _sq='';final _sp=SpeechDictation();bool _sl=false;
 Book? _lastRead;List<(Book,ReadingProgressRow)> _inProg=[];List<(SeriesData,List<int>)> _missing=[];
-Map<Shelf,List<Book>> _shelves={};List<Book> _allBooks=[];
+Map<Shelf,List<Book>> _shelves={};List<Book> _allBooks=[];List<Book> _unclassified=[];
+Timer? _debounce;
 
-@override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);_sc.addListener((){setState((){_sq=_sc.text.trim();});});_sp.initialize();
+@override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);
+_sc.addListener(_onSearchChanged);_sp.initialize();
 WidgetsBinding.instance.addPostFrameCallback((_){if(mounted){context.read<ReadingSessionStore>().load();_load();}});}
-@override void dispose(){WidgetsBinding.instance.removeObserver(this);_sc.dispose();super.dispose();}
+void _onSearchChanged(){_debounce?.cancel();_debounce=Timer(const Duration(milliseconds:400),(){if(mounted)setState((){_sq=_sc.text.trim();});});}
+@override void dispose(){_debounce?.cancel();WidgetsBinding.instance.removeObserver(this);_sc.dispose();super.dispose();}
 @override void didChangeAppLifecycleState(AppLifecycleState s){if(s==AppLifecycleState.resumed&&mounted){context.read<ReadingSessionStore>().load();_load();}}
 
 Future<void> _load()async{
 final rr=context.read<ReadingRepository>();final db=context.read<AppDb>();
 final lr=await rr.lastFinishedBook();final ip=await rr.booksInProgress();final ms=await rr.seriesWithMissingVolumes();
 final shelves=await db.getAllShelves();final sm=<Shelf,List<Book>>{};for(final s in shelves){sm[s]=await db.getBooksByShelf(s.id);}
-final ab=await db.getAllBooks();
-if(mounted)setState((){_lastRead=lr;_inProg=ip;_missing=ms;_shelves=sm;_allBooks=ab;});
+final ab=await db.getAllBooks();final uc=await db.getUnclassifiedBooks();
+if(mounted)setState((){_lastRead=lr;_inProg=ip;_missing=ms;_shelves=sm;_allBooks=ab;_unclassified=uc;});
 }
 
 Future<void> _voice()async{
@@ -73,6 +77,7 @@ return RefreshIndicator(onRefresh:_load,child:SingleChildScrollView(physics:cons
 const ReadingActiveBanner(),_searchBar(),
 if(_inProg.isNotEmpty)BookCarousel(title:'Reprendre la lecture',books:_inProg.map((e)=>e.$1).toList(),onTap:(b)=>_goBook(c,b)),
 if(_lastRead!=null)Padding(padding:const EdgeInsets.symmetric(horizontal:16,vertical:8),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('Dernier livre lu',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),const SizedBox(height:8),BookCard(book:_lastRead!,subtitle:'Terminé récemment',onTap:()=>_goBook(c,_lastRead!))])),
+if(_unclassified.isNotEmpty)BookCarousel(title:'À classer',books:_unclassified,onTap:(b)=>_goBook(c,b),trailing:const Icon(Icons.inbox,size:16,color:Colors.orange)),
 ..._shelves.entries.where((e)=>e.value.isNotEmpty).map((e)=>BookCarousel(title:e.key.name,books:e.value,onTap:(b)=>_goBook(c,b),trailing:Container(width:12,height:12,decoration:BoxDecoration(color:_col(e.key.color),shape:BoxShape.circle)))),
 SeriesAlertsSection(data:_missing),
 MarketplaceSearch(books:_allBooks),

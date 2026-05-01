@@ -585,6 +585,14 @@ class AppDb extends _$AppDb {
     return out;
   }
 
+  Future<List<Book>> getUnclassifiedBooks() async {
+    final allBooks = await getAllBooks();
+    final classified = <String>{};
+    final bsRows = await select(bookShelf).get();
+    for (final r in bsRows) classified.add(r.bookId);
+    return allBooks.where((b) => !classified.contains(b.id)).toList();
+  }
+
   Future<List<(SeriesData,List<int>)>> getSeriesWithMissingVolumes() async {
     final all=await getAllSeries();final out=<(SeriesData,List<int>)>[];
     for(final s in all){
