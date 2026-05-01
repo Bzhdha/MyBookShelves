@@ -1,79 +1,26 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:archive/archive.dart';
-import 'package:drift/drift.dart';
 import 'package:archive/archive_io.dart';
+import 'package:drift/drift.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../db/app_db.dart';
-import '../../../models/export_model.dart';
+import '../../import_export/data/library_transfer_service.dart';
 
 /// Extension export/import "famille" (v3) :
-/// - Ajoute users + userCopyMeta au même ZIP
-/// - Conserve library.json v2 pour compatibilité, et ajoute family.json v3
+/// - [library.json] v3 (séries, œuvres, exemplaires, étagères, lecture, …) + [family.json] (utilisateurs, métas)
 class FamilyTransferService {
   final AppDb db;
   FamilyTransferService(this.db);
 
   Future<File> exportFamilyZip() async {
-    // Réutilise l'export v2 (library.json + covers/) via le service Bloc 1 si tu veux.
-    // Ici, on crée un zip complet à partir de db directement.
-
-    final allSeries = await db.getAllSeries();
+    final transfer = LibraryTransferService(db);
     final allBooks = await db.getAllBooks();
-
-    final allCopies = <Copy>[];
-    for (final b in allBooks) {
-      final cs = await db.getCopiesByBook(b.id);
-      allCopies.addAll(cs);
-    }
-
-    // Export v2 (works + copies) dans library.json (compat)
-    final lib2 = ExportLibrary(
-      version: 2,
-      exportedAt: DateTime.now(),
-      series: allSeries
-          .map((s) => ExportSeries(
-                id: s.id,
-                name: s.name,
-                expectedVolumes: s.expectedVolumes,
-                tags: s.tags,
-                updatedAt: s.updatedAt,
-              ))
-          .toList(),
-      books: allBooks
-          .map((b) => ExportBook(
-                id: b.id,
-                isbn: b.isbn,
-                title: b.title,
-                seriesId: b.seriesId,
-                volumeNumber: b.volumeNumber,
-                authors: b.authors,
-                publisher: b.publisher,
-                publishedDate: b.publishedDate,
-                coverUrl: b.coverUrl,
-                tags: b.tags,
-                summary: b.summary,
-                updatedAt: b.updatedAt,
-              ))
-          .toList(),
-      copies: allCopies
-          .map((c) => ExportCopy(
-                id: c.id,
-                bookId: c.bookId,
-                rating: c.rating,
-                review: c.review,
-                condition: c.condition,
-                location: c.location,
-                notes: c.notes,
-                updatedAt: c.updatedAt,
-              ))
-          .toList(),
-    );
+    final lib2 = await transfer.buildExportLibraryPayload();
 
     // Family v3 (users + metas)
     final users = await db.select(db.users).get();
@@ -111,7 +58,7 @@ class FamilyTransferService {
     final encoder = ZipFileEncoder();
     encoder.create(zipPath);
 
-    // library.json (v2)
+    // library.json (v3)
     final libBytes = utf8.encode(jsonEncode(lib2.toJson()));
     encoder.addArchiveFile(ArchiveFile('library.json', libBytes.length, libBytes));
 
@@ -119,17 +66,7 @@ class FamilyTransferService {
     final famBytes = utf8.encode(jsonEncode(family));
     encoder.addArchiveFile(ArchiveFile('family.json', famBytes.length, famBytes));
 
-    // covers/
-    for (final b in allBooks) {
-      final localPath = b.coverLocalPath;
-      if (localPath == null) continue;
-      final f = File(localPath);
-      if (!await f.exists()) continue;
-
-      final bytes = await f.readAsBytes();
-      final filename = p.basename(localPath);
-      encoder.addArchiveFile(ArchiveFile('covers/$filename', bytes.length, bytes));
-    }
+    await addLocalCoverImagesToZip(encoder, allBooks);
 
     encoder.close();
     return File(zipPath);
