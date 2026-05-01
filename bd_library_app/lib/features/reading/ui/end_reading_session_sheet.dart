@@ -13,6 +13,7 @@ Future<void> showEndReadingSessionSheet(BuildContext context) async {
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
+    useSafeArea: true,
     builder: (ctx) {
       return _EndSessionBody(
         store: store,

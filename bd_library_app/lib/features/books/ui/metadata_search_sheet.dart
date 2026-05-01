@@ -22,10 +22,11 @@ class MetadataSearchSheet extends StatefulWidget {
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      useSafeArea: true,
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          // viewInsets.bottom = clavier ; padding.bottom = nav bar (0 si clavier la couvre)
+          bottom: MediaQuery.of(ctx).viewInsets.bottom +
+              MediaQuery.of(ctx).padding.bottom,
         ),
         child: MetadataSearchSheet(book: book),
       ),
