@@ -64,7 +64,7 @@ jobs:
           echo "storePassword=$KEYSTORE_PASSWORD" > android/key.properties
           echo "keyPassword=$KEY_PASSWORD" >> android/key.properties
           echo "keyAlias=$KEY_ALIAS" >> android/key.properties
-          echo "storeFile=app/bdlibrary.jks" >> android/key.properties
+          echo "storeFile=bdlibrary.jks" >> android/key.properties
 
       - name: Build APK (split per ABI)
         run: flutter build apk --release --split-per-abi --obfuscate --split-debug-info=.debug-info/
