@@ -8,6 +8,14 @@ import 'family_tables.dart';
 
 part 'app_db.g.dart';
 
+/// Étagère système : les œuvres sans autre classement y sont rattachées.
+abstract class DefaultUnclassifiedShelf {
+  static const String id = 'a1b2c3d4-e5f6-47a8-8c9d-0e1f2a3b4c5d';
+  static const String name = 'Livres à classer';
+  static const String color = '#78909C';
+  static const int sortOrder = -1000;
+}
+
 /// --------------------
 /// Tables
 /// --------------------
@@ -166,10 +174,11 @@ class AppDb extends _$AppDb {
   AppDb() : super(_openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
-  /// Migration strategy (v1 -> … -> v5)
+  /// Migration strategy (v1 -> … -> v6)
   /// v2: Copies. v3: Shelves + BookShelf. v4: Books.summary. v5: suivi lecture.
+  /// v6: étagère par défaut « Livres à classer » + rattrapage des œuvres sans étagère.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
@@ -194,6 +203,13 @@ class AppDb extends _$AppDb {
               ReadingGoalsCompanion.insert(id: 'default'),
             );
           }
+          if (from < 6) {
+            await ensureDefaultUnclassifiedShelfExists();
+            await assignDefaultShelfToBooksWithoutShelves();
+          }
+        },
+        beforeOpen: (details) async {
+          await ensureDefaultUnclassifiedShelfExists();
         },
       );
 
@@ -238,8 +254,41 @@ class AppDb extends _$AppDb {
   Future<void> deleteBookById(String id) async {
     await (delete(readingSessions)..where((s) => s.bookId.equals(id))).go();
     await (delete(readingProgress)..where((p) => p.bookId.equals(id))).go();
+    await (delete(bookShelf)..where((t) => t.bookId.equals(id))).go();
     await (delete(copies)..where((c) => c.bookId.equals(id))).go();
     await (delete(books)..where((t) => t.id.equals(id))).go();
+  }
+
+  /// Crée l'étagère « Livres à classer » si elle n'existe pas (id stable, ne réécrit pas un nom modifié).
+  Future<void> ensureDefaultUnclassifiedShelfExists() async {
+    final existing = await getShelfById(DefaultUnclassifiedShelf.id);
+    if (existing != null) return;
+    await into(shelves).insert(
+      ShelvesCompanion.insert(
+        id: DefaultUnclassifiedShelf.id,
+        name: DefaultUnclassifiedShelf.name,
+        color: const Value(DefaultUnclassifiedShelf.color),
+        sortOrder: const Value(DefaultUnclassifiedShelf.sortOrder),
+        updatedAt: DateTime.now(),
+      ),
+    );
+  }
+
+  /// Rattache l'étagère par défaut aux œuvres qui n'ont aucun lien [BookShelf].
+  Future<void> assignDefaultShelfToBooksWithoutShelves() async {
+    await ensureDefaultUnclassifiedShelfExists();
+    final allBooks = await getAllBooks();
+    for (final b in allBooks) {
+      final ids = await getShelfIdsByBook(b.id);
+      if (ids.isEmpty) {
+        await into(bookShelf).insert(
+          BookShelfCompanion.insert(
+            bookId: b.id,
+            shelfId: DefaultUnclassifiedShelf.id,
+          ),
+        );
+      }
+    }
   }
 
   /// Recherche d'un work par ISBN (peut retourner plusieurs, mais souvent 0/1).
@@ -321,6 +370,7 @@ class AppDb extends _$AppDb {
       into(shelves).insertOnConflictUpdate(s);
 
   Future<void> deleteShelfById(String id) async {
+    if (id == DefaultUnclassifiedShelf.id) return;
     await (delete(bookShelf)..where((t) => t.shelfId.equals(id))).go();
     await (delete(shelves)..where((t) => t.id.equals(id))).go();
   }
@@ -337,8 +387,12 @@ class AppDb extends _$AppDb {
   }
 
   Future<void> setBookShelves(String bookId, List<String> shelfIds) async {
+    await ensureDefaultUnclassifiedShelfExists();
+    final unique = <String>{...shelfIds}.toList();
+    final effective =
+        unique.isEmpty ? <String>[DefaultUnclassifiedShelf.id] : unique;
     await (delete(bookShelf)..where((t) => t.bookId.equals(bookId))).go();
-    for (final shelfId in shelfIds) {
+    for (final shelfId in effective) {
       await into(bookShelf).insert(BookShelfCompanion.insert(bookId: bookId, shelfId: shelfId));
     }
   }
