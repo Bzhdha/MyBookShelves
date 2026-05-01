@@ -234,10 +234,28 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Center(
-            child: AspectRatio(
-              aspectRatio: _controller!.value.aspectRatio,
-              child: CameraPreview(_controller!),
+          SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: _controller!.value.previewSize?.height ?? 1,
+                height: _controller!.value.previewSize?.width ?? 1,
+                child: CameraPreview(_controller!),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Center(
+                child: Container(
+                  width: 220,
+                  height: 300,
+                  decoration: BoxDecoration(
+                    border: Border.all(width: 3, color: Colors.white),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
             ),
           ),
           Positioned(
