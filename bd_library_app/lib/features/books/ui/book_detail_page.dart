@@ -389,12 +389,17 @@ class _BookDetailPageState extends State<BookDetailPage> {
   }
 
   Future<void> _replaceCoverOrBack(BuildContext context, {required bool isCover}) async {
+    final existingPath = isCover ? book!.coverLocalPath : _backCoverPath;
+    final hasExisting = existingPath != null &&
+        existingPath.trim().isNotEmpty &&
+        File(existingPath).existsSync();
     final result = await Navigator.push<CoverPhotoResult>(
       context,
       MaterialPageRoute(
         builder: (_) => CoverPhotoPage(
           bookId: widget.bookId,
           onlySuffix: isCover ? 'cover' : 'back',
+          initialImagePath: hasExisting ? existingPath : null,
         ),
       ),
     );
