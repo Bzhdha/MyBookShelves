@@ -227,6 +227,7 @@ class ExportShelf {
   final String name;
   final String color;
   final int sortOrder;
+  final String? parentId;
   final DateTime updatedAt;
 
   ExportShelf({
@@ -235,6 +236,7 @@ class ExportShelf {
     required this.color,
     required this.sortOrder,
     required this.updatedAt,
+    this.parentId,
   });
 
   Map<String, dynamic> toJson() => {
@@ -242,6 +244,7 @@ class ExportShelf {
         'name': name,
         'color': color,
         'sortOrder': sortOrder,
+        'parentId': parentId,
         'updatedAt': updatedAt.toIso8601String(),
       };
 
@@ -250,6 +253,7 @@ class ExportShelf {
         name: json['name'] as String,
         color: (json['color'] as String?) ?? '#6200EE',
         sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
+        parentId: json['parentId'] as String?,
         updatedAt: DateTime.parse(json['updatedAt'] as String),
       );
 }

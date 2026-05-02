@@ -168,6 +168,7 @@ class LibraryTransferService {
                 name: s.name,
                 color: s.color,
                 sortOrder: s.sortOrder,
+                parentId: s.parentId,
                 updatedAt: s.updatedAt,
               ))
           .toList(),
@@ -669,6 +670,7 @@ class LibraryTransferService {
           name: s.name,
           color: Value(s.color),
           sortOrder: Value(s.sortOrder),
+          parentId: Value(s.parentId),
           updatedAt: s.updatedAt,
         ));
       }
@@ -802,17 +804,13 @@ class LibraryTransferService {
 
     final allBooks = await db.getAllBooks();
     for (final b in allBooks) {
+      // Cherche exactement <bookId>.jpg/.png/.webp — pas _back.jpg ni d'autres variantes.
       final match = files.firstWhere(
-        (f) => p.basename(f.path).startsWith(b.id),
+        (f) => p.basenameWithoutExtension(f.path) == b.id,
         orElse: () => File(''),
       );
       if (match.path.isEmpty) continue;
-
-      await db.upsertBook(BooksCompanion(
-        id: Value(b.id),
-        coverLocalPath: Value(match.path),
-        updatedAt: Value(DateTime.now()),
-      ));
+      await db.updateBookCoverLocalPath(b.id, match.path);
     }
   }
 
