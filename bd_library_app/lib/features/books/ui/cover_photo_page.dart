@@ -21,16 +21,23 @@ class CoverPhotoResult {
 /// Page de prise de photo de la couverture puis du dos du livre.
 /// Après chaque prise, l'utilisateur trace un cadre (bords déplaçables) pour recadrer, puis valide.
 /// Si [onlySuffix] est 'cover' ou 'back', une seule photo est prise puis retournée.
+///
+/// Si [initialImagePath] est renseigné (fichier image local existant), l'écran de recadrage
+/// s'ouvre directement sur cette image (ex. recadrer à nouveau une couverture déjà enregistrée).
+/// « Reprendre » permet alors de passer à la caméra pour une nouvelle photo.
 class CoverPhotoPage extends StatefulWidget {
   const CoverPhotoPage({
     super.key,
     required this.bookId,
     this.onlySuffix,
+    this.initialImagePath,
   });
 
   final String bookId;
   /// 'cover' = uniquement couverture, 'back' = uniquement dos. Null = couverture puis dos.
   final String? onlySuffix;
+  /// Image locale à recadrer sans reprendre de photo (typiquement couverture ou dos actuel).
+  final String? initialImagePath;
 
   @override
   State<CoverPhotoPage> createState() => _CoverPhotoPageState();
@@ -49,12 +56,18 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
   int _imageHeight = 1;
   Rect _cropRect = const Rect.fromLTWH(0.1, 0.1, 0.8, 0.8);
   String? _coverPath;
+  bool _loadingExisting = false;
 
   @override
   void initState() {
     super.initState();
     _phaseCover = widget.onlySuffix != 'back';
-    _initCamera();
+    final initial = widget.initialImagePath?.trim();
+    if (initial != null && initial.isNotEmpty) {
+      unawaited(_loadExistingImageForCrop(initial));
+    } else {
+      _initCamera();
+    }
   }
 
   @override
@@ -65,6 +78,34 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
     }
     _controller?.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadExistingImageForCrop(String path) async {
+    if (!mounted) return;
+    setState(() {
+      _loadingExisting = true;
+      _error = null;
+    });
+    try {
+      final file = File(path);
+      if (!await file.exists()) {
+        throw StateError('Fichier introuvable');
+      }
+      final bytes = await file.readAsBytes();
+      final decoded = _decodeImageSize(bytes);
+      if (!mounted) return;
+      setState(() {
+        _loadingExisting = false;
+        _capturedImage = bytes;
+        _imageWidth = decoded?.$1 ?? 1;
+        _imageHeight = decoded?.$2 ?? 1;
+        _cropRect = const Rect.fromLTWH(0, 0, 1, 1);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingExisting = false);
+      await _initCamera();
+    }
   }
 
   Future<void> _initCamera() async {
@@ -219,6 +260,10 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
     setState(() {
       _capturedImage = null;
     });
+    final needCamera = _controller == null || !_controller!.value.isInitialized;
+    if (needCamera) {
+      unawaited(_initCamera());
+    }
   }
 
   Future<void> _toggleTorch() async {
@@ -249,14 +294,20 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
         body: Center(child: Text(_error!)),
       );
     }
+    if (_capturedImage != null) {
+      return _buildCropScreen();
+    }
+    if (_loadingExisting) {
+      final phaseLabel = _phaseCover ? 'Couverture' : 'Dos du livre';
+      return Scaffold(
+        appBar: AppBar(title: Text(phaseLabel)),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
     if (_controller == null || !_controller!.value.isInitialized) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
-    }
-
-    if (_capturedImage != null) {
-      return _buildCropScreen();
     }
 
     return _buildCameraScreen();
