@@ -323,6 +323,7 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
 
   Widget _buildCropScreen() {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: Text(_phaseCover ? 'Recadrer la couverture' : 'Recadrer le dos'),
         actions: [
@@ -457,6 +458,7 @@ class _CropOverlayState extends State<_CropOverlay> {
         return Stack(
           fit: StackFit.expand,
           children: [
+            const ColoredBox(color: Colors.black),
             Center(
               child: FittedBox(
                 fit: BoxFit.contain,
