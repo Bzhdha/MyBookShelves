@@ -132,10 +132,6 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
     final book = await bookService.getBook(bookId);
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Ajouté : ${book?.title ?? isbn}')),
-    );
-
     final scanSettings = context.read<ScanSettingsStore>();
     if (scanSettings.photoCoverEnabled && mounted) {
       try {
@@ -240,6 +236,26 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
       ),
       body: Stack(
         children: [
+          MobileScanner(
+            controller: _controller,
+            fit: BoxFit.cover,
+            onDetect: (capture) async {
+              if (_isPausedForValidation) return;
+
+              // On prend le 1er code détecté
+              final barcodes = capture.barcodes;
+              if (barcodes.isEmpty) return;
+
+              final raw = barcodes.first.rawValue;
+              final isbn = _normalizeIsbn(raw);
+              if (isbn == null) return;
+
+              if (_shouldIgnoreDetection(isbn)) return;
+
+              await _pauseWithIsbn(isbn);
+            },
+          ),
+
           // Bannière "livre ajouté" en haut, quelques secondes
           if (_showAddedBookBanner && _lastAddedBookForBanner != null)
             Positioned(
@@ -328,25 +344,6 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
                 ),
               ),
             ),
-          MobileScanner(
-            controller: _controller,
-            fit: BoxFit.cover,
-            onDetect: (capture) async {
-              if (_isPausedForValidation) return;
-
-              // On prend le 1er code détecté
-              final barcodes = capture.barcodes;
-              if (barcodes.isEmpty) return;
-
-              final raw = barcodes.first.rawValue;
-              final isbn = _normalizeIsbn(raw);
-              if (isbn == null) return;
-
-              if (_shouldIgnoreDetection(isbn)) return;
-
-              await _pauseWithIsbn(isbn);
-            },
-          ),
 
           // Overlay simple (viseur)
           Positioned.fill(
