@@ -587,6 +587,25 @@ class AppDb extends _$AppDb {
             ..limit(limit))
           .get();
 
+  /// Pour chaque `bookId`, la date de fin de séance la plus récente (sessions terminées uniquement).
+  Future<Map<String, DateTime>> lastCompletedSessionEndByBookIds(
+    List<String> bookIds,
+  ) async {
+    if (bookIds.isEmpty) return {};
+    final rows = await (select(readingSessions)
+          ..where((t) => t.bookId.isIn(bookIds) & t.endedAt.isNotNull()))
+        .get();
+    final map = <String, DateTime>{};
+    for (final s in rows) {
+      final ended = s.endedAt!;
+      final prev = map[s.bookId];
+      if (prev == null || ended.isAfter(prev)) {
+        map[s.bookId] = ended;
+      }
+    }
+    return map;
+  }
+
   Future<int> totalCompletedReadingSeconds() async {
     final sessions = await (select(readingSessions)
           ..where((t) => t.endedAt.isNotNull()))

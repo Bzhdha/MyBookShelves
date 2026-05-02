@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../db/app_db.dart';
@@ -19,6 +20,9 @@ class _StartReadingSessionPageState extends State<StartReadingSessionPage> {
   final _isbnCtrl = TextEditingController();
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
+  Future<List<(Book, ReadingProgressRow, DateTime?)>>? _inProgressFuture;
+
+  static final _dateTimeFmt = DateFormat("dd/MM/yyyy 'à' HH:mm");
 
   @override
   void initState() {
@@ -26,6 +30,13 @@ class _StartReadingSessionPageState extends State<StartReadingSessionPage> {
     _searchCtrl.addListener(() {
       setState(() => _searchQuery = _searchCtrl.text.trim());
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _inProgressFuture ??=
+        context.read<ReadingRepository>().booksInProgressForResume();
   }
 
   @override
@@ -158,9 +169,57 @@ class _StartReadingSessionPageState extends State<StartReadingSessionPage> {
     Navigator.pop(context);
   }
 
+  String _resumeProgressLabel(ReadingProgressRow p) {
+    if (p.usePercentage) {
+      return 'Progression : ${p.progressPercent ?? 0} %';
+    }
+    if (p.totalPages != null && p.totalPages! > 0) {
+      return 'Page ${p.currentPage} / ${p.totalPages}';
+    }
+    return 'Page ${p.currentPage}';
+  }
+
+  String _lastReadCaption(
+    ReadingSessionStore store,
+    String bookId,
+    DateTime? lastSessionEnd,
+  ) {
+    final active = store.activeSession;
+    if (active != null && active.bookId == bookId) {
+      return 'Séance ouverte — depuis le ${_dateTimeFmt.format(active.startedAt.toLocal())}';
+    }
+    if (lastSessionEnd != null) {
+      return 'Dernière lecture : ${_dateTimeFmt.format(lastSessionEnd.toLocal())}';
+    }
+    return 'Aucune séance terminée enregistrée sur ce livre';
+  }
+
+  List<(Book, ReadingProgressRow, DateTime?)> _orderedResumeList(
+    List<(Book, ReadingProgressRow, DateTime?)> raw,
+    ReadingSessionStore store,
+  ) {
+    final pinId = store.activeBook?.id;
+    if (pinId == null) return raw;
+    final list = List<(Book, ReadingProgressRow, DateTime?)>.of(raw);
+    list.sort((a, b) {
+      final fa = a.$1.id == pinId;
+      final fb = b.$1.id == pinId;
+      if (fa != fb) return fa ? -1 : 1;
+      final la = a.$3;
+      final lb = b.$3;
+      if (la != null && lb != null) return lb.compareTo(la);
+      if (la != null) return -1;
+      if (lb != null) return 1;
+      return a.$1.title.compareTo(b.$1.title);
+    });
+    return list;
+  }
+
   @override
   Widget build(BuildContext context) {
+    context.watch<ReadingSessionStore>();
     final repo = context.read<ReadingRepository>();
+    final sessionStore = context.read<ReadingSessionStore>();
     return Scaffold(
       appBar: AppBar(title: const Text('Démarrer une séance')),
       body: ListView(
@@ -172,7 +231,97 @@ class _StartReadingSessionPageState extends State<StartReadingSessionPage> {
             'Vous pouvez quitter l’app pendant la lecture ; au retour, '
             'indiquez la fin de séance depuis l’accueil ou le menu.',
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
+          Text(
+            'En cours de lecture',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          FutureBuilder<List<(Book, ReadingProgressRow, DateTime?)>>(
+            future: _inProgressFuture,
+            builder: (context, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snap.hasError) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'Impossible de charger les livres en cours.',
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                );
+              }
+              final rows = _orderedResumeList(snap.data ?? [], sessionStore);
+              if (rows.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Aucun livre avec le statut « en cours ». '
+                    'Vous pouvez le définir dans la fiche livre ou la progression.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                );
+              }
+              return Column(
+                children: rows.map((tuple) {
+                  final b = tuple.$1;
+                  final p = tuple.$2;
+                  final lastEnd = tuple.$3;
+                  final isActive = sessionStore.activeBook?.id == b.id;
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: Icon(
+                        isActive ? Icons.auto_stories : Icons.menu_book_outlined,
+                        color: isActive
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                      ),
+                      title: Text(b.title.isEmpty ? 'Sans titre' : b.title),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (b.authors.trim().isNotEmpty) Text(b.authors),
+                          const SizedBox(height: 4),
+                          Text(_resumeProgressLabel(p)),
+                          Text(
+                            _lastReadCaption(sessionStore, b.id, lastEnd),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                          ),
+                        ],
+                      ),
+                      isThreeLine: true,
+                      onTap: () => _pickBook(b),
+                      onLongPress: () => Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => BookDetailPage(bookId: b.id),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          const Divider(),
+          const SizedBox(height: 8),
+          Text(
+            'Autre livre',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

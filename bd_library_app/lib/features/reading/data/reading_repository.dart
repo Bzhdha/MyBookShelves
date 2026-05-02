@@ -114,5 +114,29 @@ class ReadingRepository {
 
   Future<Book?> lastFinishedBook()=>_db.getLastFinishedBook();
   Future<List<(Book,ReadingProgressRow)>> booksInProgress()=>_db.getBooksInProgress();
+
+  /// Livres « en cours » avec la date de la dernière séance terminée (si connue).
+  Future<List<(Book, ReadingProgressRow, DateTime?)>>
+      booksInProgressForResume() async {
+    final items = await _db.getBooksInProgress();
+    if (items.isEmpty) return [];
+    final ids = items.map((e) => e.$1.id).toList();
+    final lastById = await _db.lastCompletedSessionEndByBookIds(ids);
+    final list = items
+        .map(
+          (e) => (e.$1, e.$2, lastById[e.$1.id]),
+        )
+        .toList();
+    list.sort((a, b) {
+      final la = a.$3;
+      final lb = b.$3;
+      if (la != null && lb != null) return lb.compareTo(la);
+      if (la != null) return -1;
+      if (lb != null) return 1;
+      return a.$1.title.compareTo(b.$1.title);
+    });
+    return list;
+  }
+
   Future<List<(SeriesData,List<int>)>> seriesWithMissingVolumes()=>_db.getSeriesWithMissingVolumes();
 }
