@@ -332,38 +332,32 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
           ),
         ],
       ),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          _buildImageWithCropOverlay(),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              child: Material(
-                elevation: 6,
-                color: Theme.of(context).colorScheme.surface,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: FilledButton(
-                    onPressed: _isProcessing ? null : _confirmCrop,
-                    child: _isProcessing
-                        ? SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Theme.of(context).colorScheme.onPrimary,
-                            ),
-                          )
-                        : const Text('Valider le recadrage'),
-                  ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(child: _buildImageWithCropOverlay()),
+            Material(
+              elevation: 6,
+              color: Theme.of(context).colorScheme.surface,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: FilledButton(
+                  onPressed: _isProcessing ? null : _confirmCrop,
+                  child: _isProcessing
+                      ? SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
+                        )
+                      : const Text('Valider le recadrage'),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
