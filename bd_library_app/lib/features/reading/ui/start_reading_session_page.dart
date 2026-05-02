@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../db/app_db.dart';
@@ -7,6 +6,7 @@ import '../data/reading_repository.dart';
 import '../domain/reading_session_store.dart';
 import '../../books/ui/book_detail_page.dart';
 import '../../books/ui/isbn_scanner_page.dart';
+import 'reading_session_flow.dart';
 
 class StartReadingSessionPage extends StatefulWidget {
   const StartReadingSessionPage({super.key});
@@ -21,8 +21,6 @@ class _StartReadingSessionPageState extends State<StartReadingSessionPage> {
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
   Future<List<(Book, ReadingProgressRow, DateTime?)>>? _inProgressFuture;
-
-  static final _dateTimeFmt = DateFormat("dd/MM/yyyy 'à' HH:mm");
 
   @override
   void initState() {
@@ -120,79 +118,13 @@ class _StartReadingSessionPageState extends State<StartReadingSessionPage> {
         ),
       ),
     );
-    if (chosen != null && mounted) await _pickBook(chosen);
+    if (chosen != null && mounted) {
+      await startOrResumeReadingSession(context, chosen, popCount: 1);
+    }
   }
 
-  Future<void> _pickBook(Book b) async {
-    final store = context.read<ReadingSessionStore>();
-    final repo = context.read<ReadingRepository>();
-    final progressBefore = await repo.getOrCreateProgress(b.id);
-
-    var result = await store.startOrResumeSession(b.id);
-    if (!mounted) return;
-
-    if (result == StartSessionResult.conflictOtherBook) {
-      final other = store.activeBook?.title ?? 'un autre livre';
-      final go = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Séance en cours'),
-          content: Text(
-            'Une séance est déjà ouverte sur « $other ». '
-            'Terminer cette séance pour en démarrer une nouvelle sur ce livre ?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Annuler'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Terminer l’ancienne'),
-            ),
-          ],
-        ),
-      );
-      if (go != true || !mounted) return;
-      await store.abandonActiveSessionForSwitch();
-      result = await store.startOrResumeSession(b.id);
-      if (!mounted) return;
-    }
-
-    final p = await repo.getOrCreateProgress(b.id);
-    final msg = result == StartSessionResult.resumedSameBook
-        ? 'Reprise — page ${p.currentPage}'
-        : 'Séance démarrée — reprise page ${progressBefore.currentPage}';
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-    Navigator.pop(context);
-  }
-
-  String _resumeProgressLabel(ReadingProgressRow p) {
-    if (p.usePercentage) {
-      return 'Progression : ${p.progressPercent ?? 0} %';
-    }
-    if (p.totalPages != null && p.totalPages! > 0) {
-      return 'Page ${p.currentPage} / ${p.totalPages}';
-    }
-    return 'Page ${p.currentPage}';
-  }
-
-  String _lastReadCaption(
-    ReadingSessionStore store,
-    String bookId,
-    DateTime? lastSessionEnd,
-  ) {
-    final active = store.activeSession;
-    if (active != null && active.bookId == bookId) {
-      return 'Séance ouverte — depuis le ${_dateTimeFmt.format(active.startedAt.toLocal())}';
-    }
-    if (lastSessionEnd != null) {
-      return 'Dernière lecture : ${_dateTimeFmt.format(lastSessionEnd.toLocal())}';
-    }
-    return 'Aucune séance terminée enregistrée sur ce livre';
-  }
+  Future<void> _pickBook(Book b) =>
+      startOrResumeReadingSession(context, b, popCount: 1);
 
   List<(Book, ReadingProgressRow, DateTime?)> _orderedResumeList(
     List<(Book, ReadingProgressRow, DateTime?)> raw,
@@ -289,9 +221,13 @@ class _StartReadingSessionPageState extends State<StartReadingSessionPage> {
                         children: [
                           if (b.authors.trim().isNotEmpty) Text(b.authors),
                           const SizedBox(height: 4),
-                          Text(_resumeProgressLabel(p)),
+                          Text(readingResumeProgressLabel(p)),
                           Text(
-                            _lastReadCaption(sessionStore, b.id, lastEnd),
+                            readingLastSessionCaption(
+                              sessionStore,
+                              b.id,
+                              lastEnd,
+                            ),
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   color: Theme.of(context)
                                       .colorScheme

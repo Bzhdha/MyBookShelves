@@ -10,6 +10,7 @@ import '../reading/data/reading_repository.dart';
 import '../reading/domain/reading_session_store.dart';
 import '../reading/ui/reading_active_banner.dart';
 import '../reading/ui/start_reading_session_page.dart';
+import '../reading/ui/resume_reading_session_page.dart';
 import 'book_carousel.dart';
 import 'series_alerts_section.dart';
 import 'marketplace_search.dart';
@@ -93,7 +94,7 @@ const SizedBox(height:12),FloatingActionButton(heroTag:'fab_scan',onPressed:(){N
 Widget _home(BuildContext c){
 return RefreshIndicator(onRefresh:_load,child:SingleChildScrollView(physics:const AlwaysScrollableScrollPhysics(),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
 const ReadingActiveBanner(),_searchBar(),
-if(_inProg.isNotEmpty)BookCarousel(title:'Reprendre la lecture',books:_inProg.map((e)=>e.$1).toList(),onTap:(b)=>_goBook(c,b)),
+if(_inProg.isNotEmpty)BookCarousel(title:'Reprendre la lecture',books:_inProg.map((e)=>e.$1).toList(),onTap:(b)=>Navigator.push(c,MaterialPageRoute(builder:(_)=>ResumeReadingSessionPage(bookId:b.id)))),
 if(_lastRead!=null)Padding(padding:const EdgeInsets.symmetric(horizontal:16,vertical:8),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('Dernier livre lu',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),const SizedBox(height:8),BookCard(book:_lastRead!,subtitle:'Terminé récemment',onTap:()=>_goBook(c,_lastRead!))])),
 if(_unclassified.isNotEmpty)BookCarousel(title:'À classer',books:_unclassified,onTap:(b)=>_goBook(c,b),trailing:const Icon(Icons.inbox,size:16,color:Colors.orange)),
 ..._shelfGroups.expand((g){

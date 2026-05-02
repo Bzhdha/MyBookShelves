@@ -138,5 +138,16 @@ class ReadingRepository {
     return list;
   }
 
+  /// Livre, progression et date de fin de la dernière séance terminée (pour l’écran reprise).
+  Future<(Book?, ReadingProgressRow?, DateTime?)> resumeSnapshotForBook(
+    String bookId,
+  ) async {
+    final book = await bookById(bookId);
+    if (book == null) return (null, null, null);
+    final p = await getOrCreateProgress(bookId);
+    final lastById = await _db.lastCompletedSessionEndByBookIds([bookId]);
+    return (book, p, lastById[bookId]);
+  }
+
   Future<List<(SeriesData,List<int>)>> seriesWithMissingVolumes()=>_db.getSeriesWithMissingVolumes();
 }
