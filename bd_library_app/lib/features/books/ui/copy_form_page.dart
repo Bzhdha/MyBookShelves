@@ -19,9 +19,34 @@ class CopyFormPage extends StatefulWidget {
 class _CopyFormPageState extends State<CopyFormPage> {
   int rating = 0;
   int condition = 3;
-  String? location;
-  String review = '';
-  String notes = '';
+  late final TextEditingController _locationCtrl;
+  late final TextEditingController _reviewCtrl;
+  late final TextEditingController _notesCtrl;
+  String? _hydratedCopyId;
+
+  @override
+  void initState() {
+    super.initState();
+    _locationCtrl = TextEditingController();
+    _reviewCtrl = TextEditingController();
+    _notesCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _locationCtrl.dispose();
+    _reviewCtrl.dispose();
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(CopyFormPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.copyId != widget.copyId) {
+      _hydratedCopyId = null;
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -31,17 +56,19 @@ class _CopyFormPageState extends State<CopyFormPage> {
 
   Future<void> _load() async {
     if (widget.copyId == null) return;
+    if (_hydratedCopyId == widget.copyId) return;
     final bookService = context.read<BookService>();
     final copies = await bookService.getCopies(widget.bookId);
     final c = copies.firstWhere((e) => e.id == widget.copyId);
-
+    if (!mounted) return;
+    _hydratedCopyId = widget.copyId;
     setState(() {
       rating = c.rating;
       condition = c.condition;
-      location = c.location;
-      review = c.review;
-      notes = c.notes;
     });
+    _locationCtrl.text = c.location ?? '';
+    _reviewCtrl.text = c.review;
+    _notesCtrl.text = c.notes;
   }
 
   @override
@@ -78,22 +105,19 @@ class _CopyFormPageState extends State<CopyFormPage> {
             ),
             TextField(
               decoration: const InputDecoration(labelText: 'Localisation'),
-              onChanged: (v) => location = v,
-              controller: TextEditingController(text: location),
+              controller: _locationCtrl,
             ),
             TextField(
               decoration: const InputDecoration(labelText: 'Avis'),
               minLines: 2,
               maxLines: 5,
-              onChanged: (v) => review = v,
-              controller: TextEditingController(text: review),
+              controller: _reviewCtrl,
             ),
             TextField(
               decoration: const InputDecoration(labelText: 'Notes exemplaire'),
               minLines: 2,
               maxLines: 5,
-              onChanged: (v) => notes = v,
-              controller: TextEditingController(text: notes),
+              controller: _notesCtrl,
             ),
             const SizedBox(height: 24),
             FilledButton(
@@ -103,10 +127,10 @@ class _CopyFormPageState extends State<CopyFormPage> {
                   id: id,
                   bookId: widget.bookId,
                   rating: Value(rating),
-                  review: Value(review),
+                  review: Value(_reviewCtrl.text),
                   condition: Value(condition),
-                  location: Value(location),
-                  notes: Value(notes),
+                  location: Value(_locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim()),
+                  notes: Value(_notesCtrl.text),
                   updatedAt: DateTime.now(),
                 ));
                 if (context.mounted) Navigator.pop(context);

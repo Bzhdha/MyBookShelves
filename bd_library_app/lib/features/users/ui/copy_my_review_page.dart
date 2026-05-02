@@ -17,12 +17,33 @@ class CopyMyReviewPage extends StatefulWidget {
 class _CopyMyReviewPageState extends State<CopyMyReviewPage> {
   int rating = 0;
   int condition = 3; // optionnel perso, si tu veux le personnaliser, sinon ignore
-  String review = '';
+  late final TextEditingController _reviewCtrl;
   String status = 'owned';
   String? loanedToUserId;
 
   UserCopyMeta? meta;
   List<User> _users = [];
+  bool _reviewHydrated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _reviewCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _reviewCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(CopyMyReviewPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.copyId != widget.copyId) {
+      _reviewHydrated = false;
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -45,16 +66,19 @@ class _CopyMyReviewPageState extends State<CopyMyReviewPage> {
     setState(() {
       meta = existing;
       rating = existing?.rating ?? 0;
-      review = existing?.review ?? '';
       status = existing?.status ?? 'owned';
       loanedToUserId = existing?.loanedToUserId;
       _users = users;
     });
+    if (!_reviewHydrated) {
+      _reviewCtrl.text = existing?.review ?? '';
+      _reviewHydrated = true;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final userId = context.watch<ActiveUserStore>().activeUserId;
+    final userId = context.select<ActiveUserStore, String?>((s) => s.activeUserId);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Mon avis (famille)')),
@@ -116,8 +140,7 @@ class _CopyMyReviewPageState extends State<CopyMyReviewPage> {
                     decoration: const InputDecoration(labelText: 'Mon avis'),
                     minLines: 3,
                     maxLines: 6,
-                    controller: TextEditingController(text: review),
-                    onChanged: (v) => review = v,
+                    controller: _reviewCtrl,
                   ),
                   const SizedBox(height: 24),
                   FilledButton.icon(
@@ -131,7 +154,7 @@ class _CopyMyReviewPageState extends State<CopyMyReviewPage> {
                             userId: userId,
                             copyId: widget.copyId,
                             rating: Value(rating.clamp(0, 5)),
-                            review: Value(review),
+                            review: Value(_reviewCtrl.text),
                             status: Value(status),
                             loanedToUserId: Value(loanedToUserId),
                             loanedAt: Value(loanedToUserId != null ? DateTime.now() : null),
