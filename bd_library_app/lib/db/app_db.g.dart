@@ -1690,6 +1690,17 @@ class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelf> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _parentIdMeta = const VerificationMeta(
+    'parentId',
+  );
+  @override
+  late final GeneratedColumn<String> parentId = GeneratedColumn<String>(
+    'parent_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -1702,7 +1713,14 @@ class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelf> {
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, name, color, sortOrder, updatedAt];
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    color,
+    sortOrder,
+    parentId,
+    updatedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1740,6 +1758,12 @@ class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelf> {
         sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
       );
     }
+    if (data.containsKey('parent_id')) {
+      context.handle(
+        _parentIdMeta,
+        parentId.isAcceptableOrUnknown(data['parent_id']!, _parentIdMeta),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -1773,6 +1797,10 @@ class $ShelvesTable extends Shelves with TableInfo<$ShelvesTable, Shelf> {
         DriftSqlType.int,
         data['${effectivePrefix}sort_order'],
       )!,
+      parentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_id'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -1791,12 +1819,14 @@ class Shelf extends DataClass implements Insertable<Shelf> {
   final String name;
   final String color;
   final int sortOrder;
+  final String? parentId;
   final DateTime updatedAt;
   const Shelf({
     required this.id,
     required this.name,
     required this.color,
     required this.sortOrder,
+    this.parentId,
     required this.updatedAt,
   });
   @override
@@ -1806,6 +1836,9 @@ class Shelf extends DataClass implements Insertable<Shelf> {
     map['name'] = Variable<String>(name);
     map['color'] = Variable<String>(color);
     map['sort_order'] = Variable<int>(sortOrder);
+    if (!nullToAbsent || parentId != null) {
+      map['parent_id'] = Variable<String>(parentId);
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -1816,6 +1849,9 @@ class Shelf extends DataClass implements Insertable<Shelf> {
       name: Value(name),
       color: Value(color),
       sortOrder: Value(sortOrder),
+      parentId: parentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentId),
       updatedAt: Value(updatedAt),
     );
   }
@@ -1830,6 +1866,7 @@ class Shelf extends DataClass implements Insertable<Shelf> {
       name: serializer.fromJson<String>(json['name']),
       color: serializer.fromJson<String>(json['color']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      parentId: serializer.fromJson<String?>(json['parentId']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -1841,6 +1878,7 @@ class Shelf extends DataClass implements Insertable<Shelf> {
       'name': serializer.toJson<String>(name),
       'color': serializer.toJson<String>(color),
       'sortOrder': serializer.toJson<int>(sortOrder),
+      'parentId': serializer.toJson<String?>(parentId),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -1850,12 +1888,14 @@ class Shelf extends DataClass implements Insertable<Shelf> {
     String? name,
     String? color,
     int? sortOrder,
+    Value<String?> parentId = const Value.absent(),
     DateTime? updatedAt,
   }) => Shelf(
     id: id ?? this.id,
     name: name ?? this.name,
     color: color ?? this.color,
     sortOrder: sortOrder ?? this.sortOrder,
+    parentId: parentId.present ? parentId.value : this.parentId,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   Shelf copyWithCompanion(ShelvesCompanion data) {
@@ -1864,6 +1904,7 @@ class Shelf extends DataClass implements Insertable<Shelf> {
       name: data.name.present ? data.name.value : this.name,
       color: data.color.present ? data.color.value : this.color,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      parentId: data.parentId.present ? data.parentId.value : this.parentId,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -1875,13 +1916,15 @@ class Shelf extends DataClass implements Insertable<Shelf> {
           ..write('name: $name, ')
           ..write('color: $color, ')
           ..write('sortOrder: $sortOrder, ')
+          ..write('parentId: $parentId, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, color, sortOrder, updatedAt);
+  int get hashCode =>
+      Object.hash(id, name, color, sortOrder, parentId, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1890,6 +1933,7 @@ class Shelf extends DataClass implements Insertable<Shelf> {
           other.name == this.name &&
           other.color == this.color &&
           other.sortOrder == this.sortOrder &&
+          other.parentId == this.parentId &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -1898,6 +1942,7 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
   final Value<String> name;
   final Value<String> color;
   final Value<int> sortOrder;
+  final Value<String?> parentId;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const ShelvesCompanion({
@@ -1905,6 +1950,7 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
     this.name = const Value.absent(),
     this.color = const Value.absent(),
     this.sortOrder = const Value.absent(),
+    this.parentId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1913,6 +1959,7 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
     required String name,
     this.color = const Value.absent(),
     this.sortOrder = const Value.absent(),
+    this.parentId = const Value.absent(),
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -1923,6 +1970,7 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
     Expression<String>? name,
     Expression<String>? color,
     Expression<int>? sortOrder,
+    Expression<String>? parentId,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -1931,6 +1979,7 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
       if (name != null) 'name': name,
       if (color != null) 'color': color,
       if (sortOrder != null) 'sort_order': sortOrder,
+      if (parentId != null) 'parent_id': parentId,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1941,6 +1990,7 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
     Value<String>? name,
     Value<String>? color,
     Value<int>? sortOrder,
+    Value<String?>? parentId,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -1949,6 +1999,7 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
       name: name ?? this.name,
       color: color ?? this.color,
       sortOrder: sortOrder ?? this.sortOrder,
+      parentId: parentId ?? this.parentId,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -1969,6 +2020,9 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
     if (sortOrder.present) {
       map['sort_order'] = Variable<int>(sortOrder.value);
     }
+    if (parentId.present) {
+      map['parent_id'] = Variable<String>(parentId.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -1985,6 +2039,7 @@ class ShelvesCompanion extends UpdateCompanion<Shelf> {
           ..write('name: $name, ')
           ..write('color: $color, ')
           ..write('sortOrder: $sortOrder, ')
+          ..write('parentId: $parentId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -5799,6 +5854,7 @@ typedef $$ShelvesTableCreateCompanionBuilder =
       required String name,
       Value<String> color,
       Value<int> sortOrder,
+      Value<String?> parentId,
       required DateTime updatedAt,
       Value<int> rowid,
     });
@@ -5808,6 +5864,7 @@ typedef $$ShelvesTableUpdateCompanionBuilder =
       Value<String> name,
       Value<String> color,
       Value<int> sortOrder,
+      Value<String?> parentId,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -5860,6 +5917,11 @@ class $$ShelvesTableFilterComposer extends Composer<_$AppDb, $ShelvesTable> {
 
   ColumnFilters<int> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get parentId => $composableBuilder(
+    column: $table.parentId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5922,6 +5984,11 @@ class $$ShelvesTableOrderingComposer extends Composer<_$AppDb, $ShelvesTable> {
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get parentId => $composableBuilder(
+    column: $table.parentId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -5948,6 +6015,9 @@ class $$ShelvesTableAnnotationComposer
 
   GeneratedColumn<int> get sortOrder =>
       $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get parentId =>
+      $composableBuilder(column: $table.parentId, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -6010,6 +6080,7 @@ class $$ShelvesTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String> color = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
+                Value<String?> parentId = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShelvesCompanion(
@@ -6017,6 +6088,7 @@ class $$ShelvesTableTableManager
                 name: name,
                 color: color,
                 sortOrder: sortOrder,
+                parentId: parentId,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -6026,6 +6098,7 @@ class $$ShelvesTableTableManager
                 required String name,
                 Value<String> color = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
+                Value<String?> parentId = const Value.absent(),
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => ShelvesCompanion.insert(
@@ -6033,6 +6106,7 @@ class $$ShelvesTableTableManager
                 name: name,
                 color: color,
                 sortOrder: sortOrder,
+                parentId: parentId,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),

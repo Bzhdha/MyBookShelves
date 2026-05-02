@@ -67,12 +67,14 @@ class Books extends Table {
 }
 
 /// Étagères thématiques pour classer les livres (nom + couleur).
+/// parentId null = étagère racine ; non-null = sous-étagère (max 2 niveaux).
 @DataClassName('Shelf')
 class Shelves extends Table {
   TextColumn get id => text()(); // UUID
   TextColumn get name => text()();
   TextColumn get color => text().withDefault(const Constant('#6200EE'))(); // hex
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  TextColumn get parentId => text().nullable()(); // UUID étagère parente (null = racine)
   DateTimeColumn get updatedAt => dateTime()();
 
   @override
@@ -174,11 +176,12 @@ class AppDb extends _$AppDb {
   AppDb() : super(_openConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
-  /// Migration strategy (v1 -> … -> v6)
+  /// Migration strategy (v1 -> … -> v7)
   /// v2: Copies. v3: Shelves + BookShelf. v4: Books.summary. v5: suivi lecture.
   /// v6: étagère par défaut « Livres à classer » + rattrapage des œuvres sans étagère.
+  /// v7: parentId sur Shelves (hiérarchie 2 niveaux).
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
@@ -206,6 +209,9 @@ class AppDb extends _$AppDb {
           if (from < 6) {
             await ensureDefaultUnclassifiedShelfExists();
             await assignDefaultShelfToBooksWithoutShelves();
+          }
+          if (from < 7) {
+            await m.addColumn(shelves, shelves.parentId);
           }
         },
         beforeOpen: (details) async {
@@ -363,20 +369,70 @@ class AppDb extends _$AppDb {
   Future<List<Shelf>> getAllShelves() =>
       (select(shelves)..orderBy([(t) => OrderingTerm.asc(t.sortOrder), (t) => OrderingTerm.asc(t.name)])).get();
 
+  Future<List<Shelf>> getRootShelves() =>
+      (select(shelves)
+        ..where((t) => t.parentId.isNull())
+        ..orderBy([(t) => OrderingTerm.asc(t.sortOrder), (t) => OrderingTerm.asc(t.name)]))
+      .get();
+
+  Stream<List<Shelf>> watchRootShelves() =>
+      (select(shelves)
+        ..where((t) => t.parentId.isNull())
+        ..orderBy([(t) => OrderingTerm.asc(t.sortOrder), (t) => OrderingTerm.asc(t.name)]))
+      .watch();
+
+  Future<List<Shelf>> getChildShelves(String parentId) =>
+      (select(shelves)
+        ..where((t) => t.parentId.equals(parentId))
+        ..orderBy([(t) => OrderingTerm.asc(t.sortOrder), (t) => OrderingTerm.asc(t.name)]))
+      .get();
+
+  Stream<List<Shelf>> watchChildShelves(String parentId) =>
+      (select(shelves)
+        ..where((t) => t.parentId.equals(parentId))
+        ..orderBy([(t) => OrderingTerm.asc(t.sortOrder), (t) => OrderingTerm.asc(t.name)]))
+      .watch();
+
   Future<Shelf?> getShelfById(String id) =>
       (select(shelves)..where((t) => t.id.equals(id))).getSingleOrNull();
 
   Future<void> upsertShelf(ShelvesCompanion s) =>
       into(shelves).insertOnConflictUpdate(s);
 
+  /// Supprime une étagère. Les sous-étagères sont promues à la racine.
   Future<void> deleteShelfById(String id) async {
     if (id == DefaultUnclassifiedShelf.id) return;
+    // Promouvoir les enfants à la racine avant suppression
+    await (update(shelves)..where((t) => t.parentId.equals(id)))
+        .write(const ShelvesCompanion(parentId: Value(null)));
     await (delete(bookShelf)..where((t) => t.shelfId.equals(id))).go();
     await (delete(shelves)..where((t) => t.id.equals(id))).go();
   }
 
   Stream<List<Shelf>> watchAllShelves() =>
       (select(shelves)..orderBy([(t) => OrderingTerm.asc(t.sortOrder), (t) => OrderingTerm.asc(t.name)])).watch();
+
+  /// Retourne les livres directement dans [shelfId] + ceux de ses sous-étagères.
+  Future<List<Book>> getBooksInShelfWithChildren(String shelfId) async {
+    final bookIds = <String>{};
+    final direct = await (select(bookShelf)..where((t) => t.shelfId.equals(shelfId))).get();
+    for (final r in direct) bookIds.add(r.bookId);
+    final children = await getChildShelves(shelfId);
+    for (final child in children) {
+      final rows = await (select(bookShelf)..where((t) => t.shelfId.equals(child.id))).get();
+      for (final r in rows) bookIds.add(r.bookId);
+    }
+    if (bookIds.isEmpty) return [];
+    return (select(books)
+      ..where((t) => t.id.isIn(bookIds.toList()))
+      ..orderBy([(t) => OrderingTerm.asc(t.title)]))
+    .get();
+  }
+
+  Stream<List<Book>> watchBooksInShelfWithChildren(String shelfId) =>
+      (select(bookShelf)).watch().asyncExpand((_) async* {
+        yield await getBooksInShelfWithChildren(shelfId);
+      });
 
   /// --------------------
   /// BookShelf (livre ↔ étagère)

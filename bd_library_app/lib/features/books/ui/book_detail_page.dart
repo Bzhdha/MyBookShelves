@@ -555,72 +555,111 @@ class _BookDetailPageState extends State<BookDetailPage> {
     final currentIds = await shelfService.getShelfIdsForBook(widget.bookId);
     final selectedIds = currentIds.toSet();
 
+    // Groupement pour affichage hiérarchique
+    final roots = allShelves.where((s) => s.parentId == null).toList();
+    final byParent = <String, List<Shelf>>{};
+    for (final s in allShelves.where((s) => s.parentId != null)) {
+      byParent.putIfAbsent(s.parentId!, () => []).add(s);
+    }
+
     if (!context.mounted) return;
     await showModalBottomSheet(
       context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).padding.bottom,
+        ),
+        child: StatefulBuilder(
           builder: (context, setModalState) {
-            return SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'Étagères pour ce livre',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  if (allShelves.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'Créez d\'abord des étagères depuis l\'accueil.',
-                      ),
-                    )
-                  else
-                    ...allShelves.map((shelf) {
-                      final on = selectedIds.contains(shelf.id);
-                      final color = _colorFromHex(shelf.color);
-                      return CheckboxListTile(
-                        value: on,
-                        secondary: CircleAvatar(
-                          backgroundColor: color,
-                          radius: 14,
-                        ),
-                        title: Text(shelf.name),
-                        onChanged: (v) {
-                          setModalState(() {
-                            if (v == true) {
-                              selectedIds.add(shelf.id);
-                            } else {
-                              selectedIds.remove(shelf.id);
-                            }
-                          });
-                        },
-                      );
+            final items = <Widget>[];
+            for (final root in roots) {
+              final children = byParent[root.id] ?? [];
+              final rootColor = _colorFromHex(root.color);
+              if (children.isEmpty) {
+                // Étagère racine sans enfants
+                final on = selectedIds.contains(root.id);
+                items.add(CheckboxListTile(
+                  value: on,
+                  secondary: CircleAvatar(backgroundColor: rootColor, radius: 14),
+                  title: Text(root.name),
+                  onChanged: (v) => setModalState(() {
+                    if (v == true) selectedIds.add(root.id);
+                    else selectedIds.remove(root.id);
+                  }),
+                ));
+              } else {
+                // En-tête de catégorie (non sélectionnable directement)
+                items.add(Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Row(children: [
+                    CircleAvatar(backgroundColor: rootColor, radius: 10,
+                        child: const Icon(Icons.folder, size: 12, color: Colors.white)),
+                    const SizedBox(width: 8),
+                    Text(root.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        )),
+                  ]),
+                ));
+                // Sous-étagères indentées
+                for (final child in children) {
+                  final on = selectedIds.contains(child.id);
+                  items.add(CheckboxListTile(
+                    value: on,
+                    contentPadding: const EdgeInsets.only(left: 32, right: 16),
+                    secondary: CircleAvatar(
+                        backgroundColor: _colorFromHex(child.color), radius: 14),
+                    title: Text(child.name),
+                    onChanged: (v) => setModalState(() {
+                      if (v == true) selectedIds.add(child.id);
+                      else selectedIds.remove(child.id);
                     }),
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: FilledButton(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        await shelfService.setBookShelves(
-                          widget.bookId,
-                          selectedIds.toList(),
-                        );
-                        if (mounted) await _load();
-                      },
-                      child: const Text('Enregistrer'),
+                  ));
+                }
+              }
+            }
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text('Étagères pour ce livre',
+                      style: Theme.of(context).textTheme.titleLarge),
+                ),
+                if (allShelves.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text('Créez d\'abord des étagères depuis l\'accueil.'),
+                  )
+                else
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.5,
+                    ),
+                    child: SingleChildScrollView(
+                      child: Column(children: items),
                     ),
                   ),
-                ],
-              ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: FilledButton(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      await shelfService.setBookShelves(
+                          widget.bookId, selectedIds.toList());
+                      if (mounted) await _load();
+                    },
+                    child: const Text('Enregistrer'),
+                  ),
+                ),
+              ],
             );
           },
-        );
-      },
+        ),
+      ),
     );
   }
 

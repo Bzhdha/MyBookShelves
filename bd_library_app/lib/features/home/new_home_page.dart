@@ -19,6 +19,7 @@ import '../import_export/ui/import_review_page.dart';
 import '../import_export/ui/imported_libraries_list_page.dart';
 import '../users/ui/users_page.dart';
 import '../books/ui/add_book_page.dart';
+import '../shelves/domain/shelf_service.dart';
 import '../shelves/ui/shelves_page.dart';
 import '../reading/ui/reading_status_page.dart';
 import '../reading/ui/reading_progress_page.dart';
@@ -30,6 +31,14 @@ import '../settings/ui/api_key_page.dart';
 import '../settings/ui/scan_settings_page.dart';
 import '../logs/ui/logs_page.dart';
 
+/// Groupe étagère parente + ses sous-étagères pour l'affichage home.
+class _ShelfGroup {
+  final Shelf parent;
+  final List<Book> directBooks;
+  final List<(Shelf, List<Book>)> children;
+  _ShelfGroup({required this.parent, required this.directBooks, required this.children});
+}
+
 class NewHomePage extends StatefulWidget{
 const NewHomePage({super.key});
 @override State<NewHomePage> createState()=>_NHPState();
@@ -37,7 +46,7 @@ const NewHomePage({super.key});
 class _NHPState extends State<NewHomePage> with WidgetsBindingObserver{
 final _sc=TextEditingController();String _sq='';final _sp=SpeechDictation();bool _sl=false;
 Book? _lastRead;List<(Book,ReadingProgressRow)> _inProg=[];List<(SeriesData,List<int>)> _missing=[];
-Map<Shelf,List<Book>> _shelves={};List<Book> _allBooks=[];List<Book> _unclassified=[];
+List<_ShelfGroup> _shelfGroups=[];List<Book> _allBooks=[];List<Book> _unclassified=[];
 Timer? _debounce;
 
 @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);
@@ -49,10 +58,19 @@ void _onSearchChanged(){_debounce?.cancel();_debounce=Timer(const Duration(milli
 
 Future<void> _load()async{
 final rr=context.read<ReadingRepository>();final db=context.read<AppDb>();
+final shelfService=context.read<ShelfService>();
 final lr=await rr.lastFinishedBook();final ip=await rr.booksInProgress();final ms=await rr.seriesWithMissingVolumes();
-final shelves=await db.getAllShelves();final sm=<Shelf,List<Book>>{};for(final s in shelves){sm[s]=await db.getBooksByShelf(s.id);}
+final roots=await shelfService.getRootShelves();
+final groups=<_ShelfGroup>[];
+for(final root in roots){
+  final direct=await shelfService.getBooksByShelf(root.id);
+  final children=await shelfService.getChildShelves(root.id);
+  final childData=<(Shelf,List<Book>)>[];
+  for(final child in children){childData.add((child,await shelfService.getBooksByShelf(child.id)));}
+  groups.add(_ShelfGroup(parent:root,directBooks:direct,children:childData));
+}
 final ab=await db.getAllBooks();final uc=await db.getUnclassifiedBooks();
-if(mounted)setState((){_lastRead=lr;_inProg=ip;_missing=ms;_shelves=sm;_allBooks=ab;_unclassified=uc;});
+if(mounted)setState((){_lastRead=lr;_inProg=ip;_missing=ms;_shelfGroups=groups;_allBooks=ab;_unclassified=uc;});
 }
 
 Future<void> _voice()async{
@@ -78,7 +96,30 @@ const ReadingActiveBanner(),_searchBar(),
 if(_inProg.isNotEmpty)BookCarousel(title:'Reprendre la lecture',books:_inProg.map((e)=>e.$1).toList(),onTap:(b)=>_goBook(c,b)),
 if(_lastRead!=null)Padding(padding:const EdgeInsets.symmetric(horizontal:16,vertical:8),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('Dernier livre lu',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),const SizedBox(height:8),BookCard(book:_lastRead!,subtitle:'Terminé récemment',onTap:()=>_goBook(c,_lastRead!))])),
 if(_unclassified.isNotEmpty)BookCarousel(title:'À classer',books:_unclassified,onTap:(b)=>_goBook(c,b),trailing:const Icon(Icons.inbox,size:16,color:Colors.orange)),
-..._shelves.entries.where((e)=>e.value.isNotEmpty).map((e)=>BookCarousel(title:e.key.name,books:e.value,onTap:(b)=>_goBook(c,b),trailing:Container(width:12,height:12,decoration:BoxDecoration(color:_col(e.key.color),shape:BoxShape.circle)))),
+..._shelfGroups.expand((g){
+  if(g.children.isEmpty){
+    // Étagère racine sans enfants : carousel direct
+    if(g.directBooks.isEmpty)return<Widget>[];
+    return[BookCarousel(title:g.parent.name,books:g.directBooks,onTap:(b)=>_goBook(c,b),trailing:Container(width:12,height:12,decoration:BoxDecoration(color:_col(g.parent.color),shape:BoxShape.circle)))];
+  }
+  // Étagère racine avec enfants : en-tête + sous-carousels
+  final widgets=<Widget>[];
+  final parentColor=_col(g.parent.color);
+  widgets.add(Padding(padding:const EdgeInsets.fromLTRB(16,16,16,4),child:Row(children:[
+    Container(width:12,height:12,margin:const EdgeInsets.only(right:8),decoration:BoxDecoration(color:parentColor,shape:BoxShape.circle)),
+    Text(g.parent.name,style:const TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
+  ])));
+  // Livres directement dans la catégorie parente
+  if(g.directBooks.isNotEmpty){
+    widgets.add(BookCarousel(title:'Divers',books:g.directBooks,onTap:(b)=>_goBook(c,b),trailing:Container(width:10,height:10,decoration:BoxDecoration(color:parentColor.withOpacity(0.5),shape:BoxShape.circle))));
+  }
+  // Sous-étagères
+  for(final(child,books) in g.children){
+    if(books.isEmpty)continue;
+    widgets.add(BookCarousel(title:child.name,books:books,onTap:(b)=>_goBook(c,b),trailing:Container(width:10,height:10,decoration:BoxDecoration(color:_col(child.color),shape:BoxShape.circle))));
+  }
+  return widgets;
+}),
 SeriesAlertsSection(data:_missing),
 MarketplaceSearch(books:_allBooks),
 const SizedBox(height:100)

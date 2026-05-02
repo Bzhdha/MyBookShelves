@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,8 +7,10 @@ import '../domain/shelf_service.dart';
 
 class ShelfEditPage extends StatefulWidget {
   final Shelf? shelf;
+  /// Pré-sélectionne un parent à la création (ex : depuis « Ajouter sous-étagère »).
+  final String? initialParentId;
 
-  const ShelfEditPage({super.key, this.shelf});
+  const ShelfEditPage({super.key, this.shelf, this.initialParentId});
 
   @override
   State<ShelfEditPage> createState() => _ShelfEditPageState();
@@ -16,19 +19,45 @@ class ShelfEditPage extends StatefulWidget {
 class _ShelfEditPageState extends State<ShelfEditPage> {
   late final TextEditingController _nameCtrl;
   late String _selectedColorHex;
+  String? _selectedParentId;
   bool _saving = false;
+
+  List<Shelf> _rootShelves = [];
+  bool _hasChildren = false;
+  bool _loadingParents = true;
 
   @override
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.shelf?.name ?? '');
     _selectedColorHex = widget.shelf?.color ?? _shelfColorPalette.first;
+    _selectedParentId = widget.shelf?.parentId ?? widget.initialParentId;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadParentData());
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadParentData() async {
+    final service = context.read<ShelfService>();
+    final roots = await service.getRootShelves();
+    final hasChildren = widget.shelf != null
+        ? (await service.getChildShelves(widget.shelf!.id)).isNotEmpty
+        : false;
+    if (!mounted) return;
+    setState(() {
+      // Exclut l'étagère par défaut et l'étagère en cours d'édition comme parent possible
+      _rootShelves = roots
+          .where((s) =>
+              s.id != DefaultUnclassifiedShelf.id &&
+              s.id != widget.shelf?.id)
+          .toList();
+      _hasChildren = hasChildren;
+      _loadingParents = false;
+    });
   }
 
   static const _shelfColorPalette = [
@@ -54,8 +83,7 @@ class _ShelfEditPageState extends State<ShelfEditPage> {
       appBar: AppBar(
         title: Text(isEdit ? 'Modifier l\'étagère' : 'Nouvelle étagère'),
         actions: [
-          if (isEdit &&
-              widget.shelf!.id != DefaultUnclassifiedShelf.id)
+          if (isEdit && widget.shelf!.id != DefaultUnclassifiedShelf.id)
             IconButton(
               icon: const Icon(Icons.delete_outline),
               tooltip: 'Supprimer',
@@ -76,6 +104,66 @@ class _ShelfEditPageState extends State<ShelfEditPage> {
             textCapitalization: TextCapitalization.sentences,
             autofocus: !isEdit,
           ),
+          const SizedBox(height: 16),
+          // ── Sélecteur de parent ─────────────────────────────────────────
+          if (!_loadingParents) ...[
+            if (_hasChildren)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Cette étagère a des sous-étagères — elle ne peut pas être mise dans une autre étagère.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              DropdownButtonFormField<String?>(
+                value: _selectedParentId,
+                decoration: const InputDecoration(
+                  labelText: 'Étagère parente',
+                  border: OutlineInputBorder(),
+                  helperText: 'Optionnel — laissez vide pour une étagère principale',
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('— Aucune (étagère principale) —'),
+                  ),
+                  ..._rootShelves.map((s) => DropdownMenuItem<String?>(
+                        value: s.id,
+                        child: Row(children: [
+                          CircleAvatar(
+                            backgroundColor: _colorFromHex(s.color),
+                            radius: 8,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(s.name),
+                        ]),
+                      )),
+                ],
+                onChanged: (v) => setState(() => _selectedParentId = v),
+              ),
+          ] else
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: LinearProgressIndicator(),
+            ),
           const SizedBox(height: 24),
           const Text(
             'Couleur',
@@ -151,29 +239,29 @@ class _ShelfEditPageState extends State<ShelfEditPage> {
       );
       return;
     }
-
     setState(() => _saving = true);
     final service = context.read<ShelfService>();
-
     try {
       if (widget.shelf != null) {
         await service.updateShelf(
           widget.shelf!.id,
           name: name,
           color: _selectedColorHex,
+          parentId: Value(_selectedParentId),
         );
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Étagère mise à jour')),
-          );
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Étagère mise à jour')));
           Navigator.pop(context);
         }
       } else {
-        await service.createShelf(name: name, color: _selectedColorHex);
+        await service.createShelf(
+            name: name,
+            color: _selectedColorHex,
+            parentId: _selectedParentId);
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Étagère créée')),
-          );
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Étagère créée')));
           Navigator.pop(context);
         }
       }
@@ -183,13 +271,14 @@ class _ShelfEditPageState extends State<ShelfEditPage> {
   }
 
   Future<void> _delete(BuildContext context) async {
+    final hasKids = _hasChildren;
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Supprimer cette étagère ?'),
-        content: const Text(
-          'Le classement des livres dans cette étagère sera retiré. Les livres ne sont pas supprimés.',
-        ),
+        content: Text(hasKids
+            ? 'Les sous-étagères seront conservées et remontées au niveau principal. Les livres ne sont pas supprimés.'
+            : 'Le classement des livres dans cette étagère sera retiré. Les livres ne sont pas supprimés.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -210,15 +299,13 @@ class _ShelfEditPageState extends State<ShelfEditPage> {
     if (context.mounted) {
       if (deleted) {
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Étagère supprimée')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Étagère supprimée')));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'L\'étagère « ${DefaultUnclassifiedShelf.name} » ne peut pas être supprimée.',
-            ),
+                'L\'étagère « ${DefaultUnclassifiedShelf.name} » ne peut pas être supprimée.'),
           ),
         );
       }
