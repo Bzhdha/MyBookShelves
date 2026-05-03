@@ -98,16 +98,35 @@ class _EndSessionBodyState extends State<_EndSessionBody> {
             onPressed: () async {
               final endPage =
                   int.tryParse(_pageCtrl.text.trim()) ?? widget.sessionStartPage;
-              await widget.store.endActiveSession(
+              final badges = await widget.store.endActiveSession(
                 endPage: endPage,
                 markBookFinished: _finished,
               );
               if (!context.mounted) return;
               final messenger = ScaffoldMessenger.of(context);
               Navigator.pop(context);
-              messenger.showSnackBar(
-                const SnackBar(content: Text('Séance enregistrée')),
-              );
+              if (badges.isEmpty) {
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Séance enregistrée')),
+                );
+              } else if (badges.length == 1) {
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Nouveau badge : ${badges.first.title}',
+                    ),
+                  ),
+                );
+              } else {
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '${badges.length} nouveaux badges : '
+                      '${badges.map((b) => b.title).join(', ')}',
+                    ),
+                  ),
+                );
+              }
             },
             child: const Text('Enregistrer la fin de lecture'),
           ),

@@ -4497,6 +4497,371 @@ class ReadingGoalsCompanion extends UpdateCompanion<ReadingGoalsRow> {
   }
 }
 
+class $EarnedBadgesTable extends EarnedBadges
+    with TableInfo<$EarnedBadgesTable, EarnedBadgeRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $EarnedBadgesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _badgeIdMeta = const VerificationMeta(
+    'badgeId',
+  );
+  @override
+  late final GeneratedColumn<String> badgeId = GeneratedColumn<String>(
+    'badge_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _periodKeyMeta = const VerificationMeta(
+    'periodKey',
+  );
+  @override
+  late final GeneratedColumn<String> periodKey = GeneratedColumn<String>(
+    'period_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _unlockedAtMeta = const VerificationMeta(
+    'unlockedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> unlockedAt = GeneratedColumn<DateTime>(
+    'unlocked_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contextJsonMeta = const VerificationMeta(
+    'contextJson',
+  );
+  @override
+  late final GeneratedColumn<String> contextJson = GeneratedColumn<String>(
+    'context_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, badgeId, periodKey, unlockedAt, contextJson];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'earned_badges';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<EarnedBadgeRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('badge_id')) {
+      context.handle(
+        _badgeIdMeta,
+        badgeId.isAcceptableOrUnknown(data['badge_id']!, _badgeIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_badgeIdMeta);
+    }
+    if (data.containsKey('period_key')) {
+      context.handle(
+        _periodKeyMeta,
+        periodKey.isAcceptableOrUnknown(data['period_key']!, _periodKeyMeta),
+      );
+    }
+    if (data.containsKey('unlocked_at')) {
+      context.handle(
+        _unlockedAtMeta,
+        unlockedAt.isAcceptableOrUnknown(
+          data['unlocked_at']!,
+          _unlockedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_unlockedAtMeta);
+    }
+    if (data.containsKey('context_json')) {
+      context.handle(
+        _contextJsonMeta,
+        contextJson.isAcceptableOrUnknown(
+          data['context_json']!,
+          _contextJsonMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  EarnedBadgeRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return EarnedBadgeRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      badgeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}badge_id'],
+      )!,
+      periodKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}period_key'],
+      )!,
+      unlockedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}unlocked_at'],
+      )!,
+      contextJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}context_json'],
+      ),
+    );
+  }
+
+  @override
+  $EarnedBadgesTable createAlias(String alias) {
+    return $EarnedBadgesTable(attachedDatabase, alias);
+  }
+}
+
+class EarnedBadgeRow extends DataClass implements Insertable<EarnedBadgeRow> {
+  final String id;
+  final String badgeId;
+  final String periodKey;
+  final DateTime unlockedAt;
+  final String? contextJson;
+  const EarnedBadgeRow({
+    required this.id,
+    required this.badgeId,
+    required this.periodKey,
+    required this.unlockedAt,
+    this.contextJson,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['badge_id'] = Variable<String>(badgeId);
+    map['period_key'] = Variable<String>(periodKey);
+    map['unlocked_at'] = Variable<DateTime>(unlockedAt);
+    if (!nullToAbsent || contextJson != null) {
+      map['context_json'] = Variable<String>(contextJson);
+    }
+    return map;
+  }
+
+  EarnedBadgesCompanion toCompanion(bool nullToAbsent) {
+    return EarnedBadgesCompanion(
+      id: Value(id),
+      badgeId: Value(badgeId),
+      periodKey: Value(periodKey),
+      unlockedAt: Value(unlockedAt),
+      contextJson: contextJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contextJson),
+    );
+  }
+
+  factory EarnedBadgeRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return EarnedBadgeRow(
+      id: serializer.fromJson<String>(json['id']),
+      badgeId: serializer.fromJson<String>(json['badgeId']),
+      periodKey: serializer.fromJson<String>(json['periodKey']),
+      unlockedAt: serializer.fromJson<DateTime>(json['unlockedAt']),
+      contextJson: serializer.fromJson<String?>(json['contextJson']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'badgeId': serializer.toJson<String>(badgeId),
+      'periodKey': serializer.toJson<String>(periodKey),
+      'unlockedAt': serializer.toJson<DateTime>(unlockedAt),
+      'contextJson': serializer.toJson<String?>(contextJson),
+    };
+  }
+
+  EarnedBadgeRow copyWith({
+    String? id,
+    String? badgeId,
+    String? periodKey,
+    DateTime? unlockedAt,
+    Value<String?> contextJson = const Value.absent(),
+  }) => EarnedBadgeRow(
+    id: id ?? this.id,
+    badgeId: badgeId ?? this.badgeId,
+    periodKey: periodKey ?? this.periodKey,
+    unlockedAt: unlockedAt ?? this.unlockedAt,
+    contextJson: contextJson.present ? contextJson.value : this.contextJson,
+  );
+  EarnedBadgeRow copyWithCompanion(EarnedBadgesCompanion data) {
+    return EarnedBadgeRow(
+      id: data.id.present ? data.id.value : this.id,
+      badgeId: data.badgeId.present ? data.badgeId.value : this.badgeId,
+      periodKey: data.periodKey.present ? data.periodKey.value : this.periodKey,
+      unlockedAt:
+          data.unlockedAt.present ? data.unlockedAt.value : this.unlockedAt,
+      contextJson: data.contextJson.present
+          ? data.contextJson.value
+          : this.contextJson,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EarnedBadgeRow(')
+          ..write('id: $id, ')
+          ..write('badgeId: $badgeId, ')
+          ..write('periodKey: $periodKey, ')
+          ..write('unlockedAt: $unlockedAt, ')
+          ..write('contextJson: $contextJson')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, badgeId, periodKey, unlockedAt, contextJson);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is EarnedBadgeRow &&
+          other.id == this.id &&
+          other.badgeId == this.badgeId &&
+          other.periodKey == this.periodKey &&
+          other.unlockedAt == this.unlockedAt &&
+          other.contextJson == this.contextJson);
+}
+
+class EarnedBadgesCompanion extends UpdateCompanion<EarnedBadgeRow> {
+  final Value<String> id;
+  final Value<String> badgeId;
+  final Value<String> periodKey;
+  final Value<DateTime> unlockedAt;
+  final Value<String?> contextJson;
+  final Value<int> rowid;
+  const EarnedBadgesCompanion({
+    this.id = const Value.absent(),
+    this.badgeId = const Value.absent(),
+    this.periodKey = const Value.absent(),
+    this.unlockedAt = const Value.absent(),
+    this.contextJson = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  EarnedBadgesCompanion.insert({
+    required String id,
+    required String badgeId,
+    required DateTime unlockedAt,
+    this.periodKey = const Value.absent(),
+    this.contextJson = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       badgeId = Value(badgeId),
+       unlockedAt = Value(unlockedAt);
+  static Insertable<EarnedBadgeRow> custom({
+    Expression<String>? id,
+    Expression<String>? badgeId,
+    Expression<String>? periodKey,
+    Expression<DateTime>? unlockedAt,
+    Expression<String>? contextJson,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (badgeId != null) 'badge_id': badgeId,
+      if (periodKey != null) 'period_key': periodKey,
+      if (unlockedAt != null) 'unlocked_at': unlockedAt,
+      if (contextJson != null) 'context_json': contextJson,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  EarnedBadgesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? badgeId,
+    Value<String>? periodKey,
+    Value<DateTime>? unlockedAt,
+    Value<String?>? contextJson,
+    Value<int>? rowid,
+  }) {
+    return EarnedBadgesCompanion(
+      id: id ?? this.id,
+      badgeId: badgeId ?? this.badgeId,
+      periodKey: periodKey ?? this.periodKey,
+      unlockedAt: unlockedAt ?? this.unlockedAt,
+      contextJson: contextJson ?? this.contextJson,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (badgeId.present) {
+      map['badge_id'] = Variable<String>(badgeId.value);
+    }
+    if (periodKey.present) {
+      map['period_key'] = Variable<String>(periodKey.value);
+    }
+    if (unlockedAt.present) {
+      map['unlocked_at'] = Variable<DateTime>(unlockedAt.value);
+    }
+    if (contextJson.present) {
+      map['context_json'] = Variable<String>(contextJson.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EarnedBadgesCompanion(')
+          ..write('id: $id, ')
+          ..write('badgeId: $badgeId, ')
+          ..write('periodKey: $periodKey, ')
+          ..write('unlockedAt: $unlockedAt, ')
+          ..write('contextJson: $contextJson, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDb extends GeneratedDatabase {
   _$AppDb(QueryExecutor e) : super(e);
   $AppDbManager get managers => $AppDbManager(this);
@@ -4514,6 +4879,7 @@ abstract class _$AppDb extends GeneratedDatabase {
     this,
   );
   late final $ReadingGoalsTable readingGoals = $ReadingGoalsTable(this);
+  late final $EarnedBadgesTable earnedBadges = $EarnedBadgesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4529,6 +4895,7 @@ abstract class _$AppDb extends GeneratedDatabase {
     readingProgress,
     readingSessions,
     readingGoals,
+    earnedBadges,
   ];
 }
 
@@ -7883,6 +8250,215 @@ typedef $$ReadingGoalsTableProcessedTableManager =
       PrefetchHooks Function()
     >;
 
+typedef $$EarnedBadgesTableCreateCompanionBuilder =
+    EarnedBadgesCompanion Function({
+      required String id,
+      required String badgeId,
+      required DateTime unlockedAt,
+      Value<String> periodKey,
+      Value<String?> contextJson,
+      Value<int> rowid,
+    });
+typedef $$EarnedBadgesTableUpdateCompanionBuilder =
+    EarnedBadgesCompanion Function({
+      Value<String> id,
+      Value<String> badgeId,
+      Value<String> periodKey,
+      Value<DateTime> unlockedAt,
+      Value<String?> contextJson,
+      Value<int> rowid,
+    });
+
+class $$EarnedBadgesTableFilterComposer
+    extends Composer<_$AppDb, $EarnedBadgesTable> {
+  $$EarnedBadgesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get badgeId => $composableBuilder(
+    column: $table.badgeId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get periodKey => $composableBuilder(
+    column: $table.periodKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get unlockedAt => $composableBuilder(
+    column: $table.unlockedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contextJson => $composableBuilder(
+    column: $table.contextJson,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$EarnedBadgesTableOrderingComposer
+    extends Composer<_$AppDb, $EarnedBadgesTable> {
+  $$EarnedBadgesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get badgeId => $composableBuilder(
+    column: $table.badgeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get periodKey => $composableBuilder(
+    column: $table.periodKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get unlockedAt => $composableBuilder(
+    column: $table.unlockedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contextJson => $composableBuilder(
+    column: $table.contextJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$EarnedBadgesTableAnnotationComposer
+    extends Composer<_$AppDb, $EarnedBadgesTable> {
+  $$EarnedBadgesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get badgeId => $composableBuilder(
+    column: $table.badgeId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get periodKey => $composableBuilder(
+    column: $table.periodKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get unlockedAt => $composableBuilder(
+    column: $table.unlockedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get contextJson => $composableBuilder(
+    column: $table.contextJson,
+    builder: (column) => column,
+  );
+}
+
+class $$EarnedBadgesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDb,
+          $EarnedBadgesTable,
+          EarnedBadgeRow,
+          $$EarnedBadgesTableFilterComposer,
+          $$EarnedBadgesTableOrderingComposer,
+          $$EarnedBadgesTableAnnotationComposer,
+          $$EarnedBadgesTableCreateCompanionBuilder,
+          $$EarnedBadgesTableUpdateCompanionBuilder,
+          (
+            EarnedBadgeRow,
+            BaseReferences<_$AppDb, $EarnedBadgesTable, EarnedBadgeRow>,
+          ),
+          EarnedBadgeRow,
+          PrefetchHooks Function()
+        > {
+  $$EarnedBadgesTableTableManager(_$AppDb db, $EarnedBadgesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$EarnedBadgesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$EarnedBadgesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$EarnedBadgesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> badgeId = const Value.absent(),
+                Value<String> periodKey = const Value.absent(),
+                Value<DateTime> unlockedAt = const Value.absent(),
+                Value<String?> contextJson = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => EarnedBadgesCompanion(
+                id: id,
+                badgeId: badgeId,
+                periodKey: periodKey,
+                unlockedAt: unlockedAt,
+                contextJson: contextJson,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String badgeId,
+                required DateTime unlockedAt,
+                Value<String> periodKey = const Value.absent(),
+                Value<String?> contextJson = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => EarnedBadgesCompanion.insert(
+                id: id,
+                badgeId: badgeId,
+                unlockedAt: unlockedAt,
+                periodKey: periodKey,
+                contextJson: contextJson,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$EarnedBadgesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDb,
+      $EarnedBadgesTable,
+      EarnedBadgeRow,
+      $$EarnedBadgesTableFilterComposer,
+      $$EarnedBadgesTableOrderingComposer,
+      $$EarnedBadgesTableAnnotationComposer,
+      $$EarnedBadgesTableCreateCompanionBuilder,
+      $$EarnedBadgesTableUpdateCompanionBuilder,
+      (
+        EarnedBadgeRow,
+        BaseReferences<_$AppDb, $EarnedBadgesTable, EarnedBadgeRow>,
+      ),
+      EarnedBadgeRow,
+      PrefetchHooks Function()
+    >;
+
 class $AppDbManager {
   final _$AppDb _db;
   $AppDbManager(this._db);
@@ -7906,4 +8482,6 @@ class $AppDbManager {
       $$ReadingSessionsTableTableManager(_db, _db.readingSessions);
   $$ReadingGoalsTableTableManager get readingGoals =>
       $$ReadingGoalsTableTableManager(_db, _db.readingGoals);
+  $$EarnedBadgesTableTableManager get earnedBadges =>
+      $$EarnedBadgesTableTableManager(_db, _db.earnedBadges);
 }

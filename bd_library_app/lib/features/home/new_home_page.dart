@@ -27,6 +27,8 @@ import '../reading/ui/reading_progress_page.dart';
 import '../reading/ui/reading_goals_page.dart';
 import '../reading/ui/reading_history_page.dart';
 import '../reading/ui/reading_stats_page.dart';
+import '../reading/ui/reading_badges_page.dart';
+import '../reading/domain/reading_badge_evaluator.dart';
 import '../settings/data/app_lock_store.dart';
 import '../settings/ui/api_key_page.dart';
 import '../settings/ui/scan_settings_page.dart';
@@ -58,7 +60,10 @@ void _onSearchChanged(){_debounce?.cancel();_debounce=Timer(const Duration(milli
 @override void didChangeAppLifecycleState(AppLifecycleState s){if(s==AppLifecycleState.resumed&&mounted){context.read<ReadingSessionStore>().load();_load();}}
 
 Future<void> _load()async{
+if(!mounted)return;
 final rr=context.read<ReadingRepository>();final db=context.read<AppDb>();
+await ReadingBadgeEvaluator(db).syncMilestoneBadgesFromProgress();
+if(!mounted)return;
 final shelfService=context.read<ShelfService>();
 final lr=await rr.lastFinishedBook();final ip=await rr.booksInProgress();final ms=await rr.seriesWithMissingVolumes();
 final roots=await shelfService.getRootShelves();
@@ -163,7 +168,8 @@ ListTile(leading:const Icon(Icons.label_outline),title:const Text('Statuts'),onT
 ListTile(leading:const Icon(Icons.linear_scale),title:const Text('Progression'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingProgressPage()));}),
 ListTile(leading:const Icon(Icons.flag_outlined),title:const Text('Objectifs'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingGoalsPage()));}),
 ListTile(leading:const Icon(Icons.history),title:const Text('Historique'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingHistoryPage()));}),
-ListTile(leading:const Icon(Icons.bar_chart_outlined),title:const Text('Stats'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingStatsPage()));})]),
+ListTile(leading:const Icon(Icons.bar_chart_outlined),title:const Text('Stats'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingStatsPage()));}),
+ListTile(leading:const Icon(Icons.emoji_events_outlined),title:const Text('Badges'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingBadgesPage()));})]),
 ListTile(leading:const Icon(Icons.key),title:const Text('Clés API'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ApiKeyPage()));}),
 ListTile(leading:const Icon(Icons.settings),title:const Text('Paramètres scan'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ScanSettingsPage()));}),
 Consumer<AppLockStore>(builder:(_,st,__)=>SwitchListTile(secondary:const Icon(Icons.lock_outline),title:const Text('Verrou bio'),value:st.enabled,onChanged:(v)=>st.setEnabled(v))),

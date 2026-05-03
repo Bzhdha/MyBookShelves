@@ -37,6 +37,7 @@ import 'core/speech_dictation.dart';
 import 'features/logs/ui/logs_page.dart';
 import 'features/settings/ui/scan_settings_page.dart';
 import 'features/reading/data/reading_repository.dart';
+import 'features/reading/domain/reading_badge_evaluator.dart';
 import 'features/reading/domain/reading_session_store.dart';
 import 'features/reading/ui/reading_active_banner.dart';
 import 'features/reading/ui/reading_status_page.dart';
@@ -98,8 +99,10 @@ Future<void> main() async {
         ChangeNotifierProvider<AppLockStore>.value(value: appLockStore),
         Provider<ReadingRepository>.value(value: readingRepository),
         ChangeNotifierProvider<ReadingSessionStore>(
-          create: (context) =>
-              ReadingSessionStore(context.read<ReadingRepository>())..load(),
+          create: (context) => ReadingSessionStore(
+            context.read<ReadingRepository>(),
+            ReadingBadgeEvaluator(context.read<AppDb>()),
+          )..load(),
         ),
       ],
       child: const MyApp(),

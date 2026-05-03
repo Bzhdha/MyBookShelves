@@ -157,6 +157,20 @@ class ReadingGoals extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Badges de lecture débloqués (clé stable + période pour les badges récurrents).
+@DataClassName('EarnedBadgeRow')
+class EarnedBadges extends Table {
+  TextColumn get id => text()();
+  TextColumn get badgeId => text()();
+  /// Ex. clé semaine `2026-05-04` (lundi), mois `2026-05`, année `2026`, ou `''` pour badges vie entière.
+  TextColumn get periodKey => text().withDefault(const Constant(''))();
+  DateTimeColumn get unlockedAt => dateTime()();
+  TextColumn get contextJson => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// --------------------
 /// DB
 /// --------------------
@@ -171,17 +185,19 @@ class ReadingGoals extends Table {
   ReadingProgress,
   ReadingSessions,
   ReadingGoals,
+  EarnedBadges,
 ])
 class AppDb extends _$AppDb {
   AppDb() : super(_openConnection());
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
-  /// Migration strategy (v1 -> … -> v7)
+  /// Migration strategy (v1 -> … -> v8)
   /// v2: Copies. v3: Shelves + BookShelf. v4: Books.summary. v5: suivi lecture.
   /// v6: étagère par défaut « Livres à classer » + rattrapage des œuvres sans étagère.
   /// v7: parentId sur Shelves (hiérarchie 2 niveaux).
+  /// v8: badges de lecture ([EarnedBadges]).
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
@@ -212,6 +228,9 @@ class AppDb extends _$AppDb {
           }
           if (from < 7) {
             await m.addColumn(shelves, shelves.parentId);
+          }
+          if (from < 8) {
+            await m.createTable(earnedBadges);
           }
         },
         beforeOpen: (details) async {
@@ -632,6 +651,37 @@ class AppDb extends _$AppDb {
 
   Future<void> upsertReadingGoals(ReadingGoalsCompanion g) =>
       into(readingGoals).insertOnConflictUpdate(g);
+
+  /// --------------------
+  /// Badges de lecture
+  /// --------------------
+  Future<EarnedBadgeRow?> earnedBadgeByBadgeAndPeriod(
+    String badgeId,
+    String periodKey,
+  ) =>
+      (select(earnedBadges)
+            ..where(
+              (t) => t.badgeId.equals(badgeId) & t.periodKey.equals(periodKey),
+            ))
+          .getSingleOrNull();
+
+  Future<bool> insertEarnedBadgeIfAbsent(EarnedBadgesCompanion row) async {
+    if (!row.badgeId.present) return false;
+    final badgeId = row.badgeId.value;
+    final periodKey = row.periodKey.present ? row.periodKey.value : '';
+    final existing = await earnedBadgeByBadgeAndPeriod(badgeId, periodKey);
+    if (existing != null) return false;
+    await into(earnedBadges).insert(row);
+    return true;
+  }
+
+  Future<List<EarnedBadgeRow>> allEarnedBadgesOrdered() =>
+      (select(earnedBadges)..orderBy([(t) => OrderingTerm.desc(t.unlockedAt)]))
+          .get();
+
+  Stream<List<EarnedBadgeRow>> watchEarnedBadges() =>
+      (select(earnedBadges)..orderBy([(t) => OrderingTerm.desc(t.unlockedAt)]))
+          .watch();
 
   /// Livres terminés (sessions avec [finishedBook]) dans l’intervalle [from, to].
   Future<int> countFinishedBooksBetween(DateTime from, DateTime to) async {

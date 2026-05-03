@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../db/app_db.dart';
 import '../../../models/export_model.dart';
+import '../../reading/domain/reading_badge_evaluator.dart';
 
 /// Couvertures locales + photo dos (`<bookId>_back.jpg`) dans le ZIP sous `covers/`.
 Future<void> addLocalCoverImagesToZip(
@@ -542,6 +543,7 @@ class LibraryTransferService {
     await _applyImportBookShelves(plan);
     await _applyImportReading(plan);
     await db.assignDefaultShelfToBooksWithoutShelves();
+    await ReadingBadgeEvaluator(db).syncMilestoneBadgesFromProgress();
   }
 
   /// Applique un plan d'import sans fichier ZIP (JSON seul : pas d'extraction de couvertures).
@@ -659,6 +661,7 @@ class LibraryTransferService {
     await _applyImportBookShelves(plan);
     await _applyImportReading(plan);
     await db.assignDefaultShelfToBooksWithoutShelves();
+    await ReadingBadgeEvaluator(db).syncMilestoneBadgesFromProgress();
   }
 
   Future<void> _applyImportShelves(ImportPlan plan) async {

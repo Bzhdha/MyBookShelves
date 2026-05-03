@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../db/app_db.dart';
 import '../data/reading_repository.dart';
+import 'reading_badge_evaluator.dart';
 
 enum StartSessionResult {
   started,
@@ -12,9 +13,10 @@ enum StartSessionResult {
 }
 
 class ReadingSessionStore extends ChangeNotifier {
-  ReadingSessionStore(this._repo);
+  ReadingSessionStore(this._repo, this._badgeEvaluator);
 
   final ReadingRepository _repo;
+  final ReadingBadgeEvaluator _badgeEvaluator;
   final Uuid _uuid = const Uuid();
 
   ReadingSession? _session;
@@ -71,12 +73,13 @@ class ReadingSessionStore extends ChangeNotifier {
   }
 
   /// Termine la séance active : enregistre la page d’arrêt et la durée (temps entre début et fin).
-  Future<void> endActiveSession({
+  /// Retourne les badges nouvellement débloqués si le livre est marqué comme terminé.
+  Future<List<ReadingBadgeUnlock>> endActiveSession({
     required int endPage,
     required bool markBookFinished,
   }) async {
     final s = _session;
-    if (s == null) return;
+    if (s == null) return [];
 
     final endedAt = DateTime.now();
     final duration = endedAt.difference(s.startedAt).inSeconds;
@@ -109,6 +112,9 @@ class ReadingSessionStore extends ChangeNotifier {
     _session = null;
     _book = null;
     notifyListeners();
+
+    if (!markBookFinished) return [];
+    return _badgeEvaluator.onBookFinished(bookId, endedAt);
   }
 
   /// Ferme une séance en cours (autre livre) pour en démarrer une nouvelle : enregistre fin = début, durée réelle.
