@@ -140,7 +140,10 @@ Widget _searchBar()=>Padding(padding:const EdgeInsets.symmetric(horizontal:16,ve
 Widget _cov(Book b){final p=b.coverLocalPath;final h=p!=null&&p.isNotEmpty;return SizedBox(width:40,height:56,child:ClipRRect(borderRadius:BorderRadius.circular(4),child:h?Image.file(File(p),fit:BoxFit.cover,errorBuilder:(_,__,___)=>_ph()):_ph()));}
 static Widget _ph()=>Container(color:Colors.grey.shade300,child:const Icon(Icons.menu_book,size:28));
 Color _col(String hex){try{return Color(int.parse(hex.replaceFirst('#','0xff')));}catch(_){return Colors.blue;}}
-void _goBook(BuildContext c,Book b)=>Navigator.push(c,MaterialPageRoute(builder:(_)=>BookDetailPage(bookId:b.id)));
+Future<void> _goBook(BuildContext c,Book b)async{
+await Navigator.push<void>(c,MaterialPageRoute(builder:(_)=>BookDetailPage(bookId:b.id)));
+if(mounted)await _load();
+}
 
 Widget _drawer(BuildContext c)=>Drawer(child:ListView(padding:EdgeInsets.zero,children:[
 const DrawerHeader(decoration:BoxDecoration(color:Colors.blue),child:Text('Bibliothèque BD',style:TextStyle(color:Colors.white,fontSize:24))),
