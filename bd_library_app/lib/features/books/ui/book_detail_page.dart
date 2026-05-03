@@ -25,6 +25,9 @@ class BookDetailPage extends StatefulWidget {
 }
 
 class _BookDetailPageState extends State<BookDetailPage> {
+  /// Même proportion que sur l’accueil ([BookCarousel] : 100×140).
+  static const double _coverDisplayAspectRatio = 100 / 140;
+
   Book? book;
   List<Copy> copies = [];
   List<Shelf> bookShelves = [];
@@ -154,7 +157,15 @@ class _BookDetailPageState extends State<BookDetailPage> {
         },
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          16,
+          16,
+          16 +
+              MediaQuery.paddingOf(context).bottom +
+              kFloatingActionButtonMargin +
+              72,
+        ),
         children: [
           _buildCoversSection(context),
           const SizedBox(height: 16),
@@ -445,7 +456,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
 
   Widget _coverImage(String path, {String? label}) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (label != null)
           Padding(
@@ -460,12 +471,13 @@ class _BookDetailPageState extends State<BookDetailPage> {
           ),
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Image.file(
-            File(path),
-            fit: BoxFit.cover,
-            height: 200,
-            width: double.infinity,
-            errorBuilder: (_, _, _) => _coverPlaceholder(),
+          child: AspectRatio(
+            aspectRatio: _coverDisplayAspectRatio,
+            child: Image.file(
+              File(path),
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => _coverPlaceholder(),
+            ),
           ),
         ),
       ],
@@ -473,13 +485,12 @@ class _BookDetailPageState extends State<BookDetailPage> {
   }
 
   Widget _coverPlaceholder() {
-    return Container(
-      height: 200,
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Icon(Icons.photo_library_outlined, size: 48),
+      child: const Center(child: Icon(Icons.photo_library_outlined, size: 48)),
     );
   }
 
