@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 
 import '../../../db/app_db.dart';
 import '../domain/book_service.dart';
-import '../../settings/data/scan_settings_store.dart';
 import '../../settings/ui/scan_settings_page.dart';
 import 'cover_photo_page.dart';
 import 'book_detail_page.dart';
@@ -31,8 +30,14 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
     torchEnabled: false,
   );
 
-  String? _pendingIsbn; // ISBN en attente de validation
-  String? _lastAcceptedIsbn; // anti doublon "validation"
+  /// ISBN en cours de recherche / création fiche (affiche un chargement).
+  String? _processingIsbn;
+
+  /// Après ajout : livre affiché dans la carte d'actions (autre scan ou photos).
+  Book? _choiceBook;
+  String? _choiceBookId;
+
+  String? _lastAcceptedIsbn; // anti doublon scan rapproché
   DateTime? _lastAcceptedAt;
 
   /// Livre venant d'être ajouté : affiché en bannière en haut quelques secondes.
@@ -40,7 +45,15 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
   bool _showAddedBookBanner = false;
   Timer? _bannerHideTimer;
 
-  bool get _isPausedForValidation => _pendingIsbn != null;
+  bool get _blocksBarcodeDetection =>
+      _processingIsbn != null || _choiceBook != null;
+
+  String get _isbnLineForChoiceCard {
+    final fromBook = _choiceBook?.isbn?.trim();
+    if (fromBook != null && fromBook.isNotEmpty) return 'ISBN $fromBook';
+    if (_lastAcceptedIsbn != null) return 'ISBN $_lastAcceptedIsbn';
+    return 'ISBN —';
+  }
 
   static const Duration _bannerDisplayDuration = Duration(seconds: 4);
 
@@ -80,92 +93,174 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
     return DateTime.now().difference(_lastAcceptedAt!) < const Duration(seconds: 2);
   }
 
-  Future<void> _onValidate(BookService bookService, String isbn) async {
-    if (widget.lookupOnly) {
-      _lastAcceptedIsbn = isbn;
-      _lastAcceptedAt = DateTime.now();
-      if (!mounted) return;
-      Navigator.pop<String>(context, isbn);
-      return;
-    }
+  Future<void> _resumeScanning() async {
+    if (!mounted) return;
+    setState(() {
+      _processingIsbn = null;
+      _choiceBook = null;
+      _choiceBookId = null;
+    });
+    await _controller.start();
+  }
 
-    final existing = await bookService.findExistingByIsbn(isbn);
-    if (existing != null && mounted) {
-      final copies = await bookService.countCopies(existing.id);
-      final action = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Livre déjà présent'),
-          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('« ${existing.title} »', style: const TextStyle(fontWeight: FontWeight.bold)),
-            if (existing.authors.isNotEmpty) Text(existing.authors),
-            const SizedBox(height: 8),
-            Text('Vous possédez déjà $copies exemplaire${copies > 1 ? 's' : ''}.'),
-          ]),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, 'cancel'), child: const Text('Annuler')),
-            TextButton(onPressed: () => Navigator.pop(ctx, 'view'), child: const Text('Voir')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, 'add'), child: const Text('Ajouter quand même')),
-          ],
+  Future<void> _applyCoverPhotoResult(
+    BookService bookService,
+    String bookId,
+    CoverPhotoResult? result,
+  ) async {
+    if (result == null) return;
+    if (result.coverPath != null) {
+      await bookService.updateBookCoverFromScan(bookId, result.coverPath!);
+    }
+  }
+
+  Future<void> _onChooseCoverPhotos(
+    BookService bookService,
+    String bookId,
+    Book book,
+  ) async {
+    try {
+      final result = await Navigator.push<CoverPhotoResult?>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CoverPhotoPage(bookId: bookId),
         ),
       );
       if (!mounted) return;
-      if (action == 'cancel' || action == null) {
-        setState(() => _pendingIsbn = null);
-        await _controller.start();
-        return;
-      }
-      if (action == 'view') {
-        setState(() => _pendingIsbn = null);
-        await Navigator.push(context, MaterialPageRoute(builder: (_) => BookDetailPage(bookId: existing.id)));
+      await _applyCoverPhotoResult(bookService, bookId, result);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _choiceBook = null;
+          _choiceBookId = null;
+          _lastAddedBookForBanner = book;
+          _showAddedBookBanner = true;
+        });
+        _scheduleBannerHide();
         _resumeScannerAfterReturn();
-        return;
       }
     }
+  }
 
-    final bookId = await bookService.addOrUpdateFromIsbnScan(isbn);
-
-    _lastAcceptedIsbn = isbn;
-    _lastAcceptedAt = DateTime.now();
-
-    if (!mounted) return;
-    final book = await bookService.getBook(bookId);
-    if (!mounted) return;
-
-    final scanSettings = context.read<ScanSettingsStore>();
-    if (scanSettings.photoCoverEnabled && mounted) {
-      try {
-        final result = await Navigator.push<CoverPhotoResult>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => CoverPhotoPage(bookId: bookId),
-          ),
-        );
-        if (result != null && result.coverPath != null && mounted) {
-          await bookService.updateBookCoverFromScan(bookId, result.coverPath!);
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _pendingIsbn = null;
-            _lastAddedBookForBanner = book;
-            _showAddedBookBanner = true;
-          });
-          _scheduleBannerHide();
-          _resumeScannerAfterReturn();
-        }
-      }
-      return;
-    }
-
+  Future<void> _onScanAnotherBook(Book book) async {
     if (!mounted) return;
     setState(() {
-      _pendingIsbn = null;
+      _choiceBook = null;
+      _choiceBookId = null;
       _lastAddedBookForBanner = book;
       _showAddedBookBanner = true;
     });
     _scheduleBannerHide();
     await _controller.start();
+  }
+
+  /// Recherche et création d'exemplaire dès la détection du code-barres.
+  Future<void> _processIsbnAfterDetection(
+    BookService bookService,
+    String isbn,
+  ) async {
+    if (widget.lookupOnly) {
+      _lastAcceptedIsbn = isbn;
+      _lastAcceptedAt = DateTime.now();
+      if (!mounted) return;
+      await _controller.stop();
+      if (!mounted) return;
+      Navigator.pop<String>(context, isbn);
+      return;
+    }
+
+    setState(() => _processingIsbn = isbn);
+    await _controller.stop();
+
+    try {
+      final existing = await bookService.findExistingByIsbn(isbn);
+      if (!mounted) return;
+
+      if (existing != null) {
+        setState(() => _processingIsbn = null);
+        final copies = await bookService.countCopies(existing.id);
+        if (!mounted) return;
+        final action = await showDialog<String>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Livre déjà présent'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('« ${existing.title} »',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                if (existing.authors.isNotEmpty) Text(existing.authors),
+                const SizedBox(height: 8),
+                Text(
+                  'Vous possédez déjà $copies exemplaire${copies > 1 ? 's' : ''}.',
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, 'cancel'),
+                child: const Text('Annuler'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, 'view'),
+                child: const Text('Voir'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, 'add'),
+                child: const Text('Ajouter quand même'),
+              ),
+            ],
+          ),
+        );
+        if (!mounted) return;
+        if (action == 'cancel' || action == null) {
+          await _resumeScanning();
+          return;
+        }
+        if (action == 'view') {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BookDetailPage(bookId: existing.id),
+            ),
+          );
+          _resumeScannerAfterReturn();
+          return;
+        }
+        setState(() => _processingIsbn = isbn);
+      }
+
+      final bookId = await bookService.addOrUpdateFromIsbnScan(isbn);
+      _lastAcceptedIsbn = isbn;
+      _lastAcceptedAt = DateTime.now();
+
+      if (!mounted) return;
+      final book = await bookService.getBook(bookId);
+      if (!mounted) return;
+      if (book == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Livre introuvable après enregistrement.')),
+          );
+          await _resumeScanning();
+        }
+        return;
+      }
+
+      setState(() {
+        _processingIsbn = null;
+        _choiceBook = book;
+        _choiceBookId = bookId;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Impossible d\'ajouter le livre : $e')),
+        );
+        await _resumeScanning();
+      }
+    }
   }
 
   /// Redémarre le lecteur après un retour de navigation (ex. CoverPhotoPage).
@@ -180,18 +275,6 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
     });
   }
 
-  Future<void> _onReject() async {
-    setState(() => _pendingIsbn = null);
-    await _controller.start();
-  }
-
-  Future<void> _pauseWithIsbn(String isbn) async {
-    // On ne garde que les ISBN "probables" (tu peux enlever ce filtre si tu veux tout accepter)
-    if (isbn.length == 13 && !_isProbablyIsbn13(isbn)) return;
-
-    setState(() => _pendingIsbn = isbn);
-    await _controller.stop();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -240,9 +323,8 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
             controller: _controller,
             fit: BoxFit.cover,
             onDetect: (capture) async {
-              if (_isPausedForValidation) return;
+              if (_blocksBarcodeDetection) return;
 
-              // On prend le 1er code détecté
               final barcodes = capture.barcodes;
               if (barcodes.isEmpty) return;
 
@@ -250,9 +332,11 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
               final isbn = _normalizeIsbn(raw);
               if (isbn == null) return;
 
+              if (isbn.length == 13 && !_isProbablyIsbn13(isbn)) return;
+
               if (_shouldIgnoreDetection(isbn)) return;
 
-              await _pauseWithIsbn(isbn);
+              await _processIsbnAfterDetection(bookService, isbn);
             },
           ),
 
@@ -361,8 +445,8 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
             ),
           ),
 
-          // Carte de validation (bas)
-          if (_pendingIsbn != null)
+          // Recherche en cours
+          if (!widget.lookupOnly && _processingIsbn != null)
             Align(
               alignment: Alignment.bottomCenter,
               child: SafeArea(
@@ -370,45 +454,112 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
                 child: Card(
                   elevation: 6,
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
+                        const SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Détection',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                              Text(
+                                _processingIsbn!,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                _pendingIsbn!,
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                widget.lookupOnly
-                                    ? 'Valider pour utiliser ce code'
-                                    : 'Valider pour ajouter et passer à la BD suivante',
-                                style: const TextStyle(fontSize: 12),
+                                'Recherche et enregistrement…',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: _onReject,
-                          tooltip: 'Rejeter',
+                        TextButton(
+                          onPressed: _resumeScanning,
+                          child: const Text('Annuler'),
                         ),
-                        const SizedBox(width: 4),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // Fiche ajoutée : enchaîner un autre ISBN ou prendre couverture / dos
+          if (!widget.lookupOnly &&
+              _choiceBook != null &&
+              _choiceBookId != null)
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: SafeArea(
+                minimum: const EdgeInsets.all(12),
+                child: Card(
+                  elevation: 6,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Référence enregistrée',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _choiceBook!.title,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (_choiceBook!.authors.trim().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _choiceBook!.authors,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Text(
+                          _isbnLineForChoiceCard,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 16),
                         FilledButton.icon(
                           onPressed: () =>
-                              _onValidate(bookService, _pendingIsbn!),
-                          icon: const Icon(Icons.check),
-                          label: const Text('Valider'),
+                              _onScanAnotherBook(_choiceBook!),
+                          icon: const Icon(Icons.qr_code_scanner),
+                          label: const Text('Scanner un autre livre'),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: () => _onChooseCoverPhotos(
+                            bookService,
+                            _choiceBookId!,
+                            _choiceBook!,
+                          ),
+                          icon: const Icon(Icons.photo_camera_outlined),
+                          label: const Text('Photographier couverture et dos'),
                         ),
                       ],
                     ),
