@@ -263,15 +263,30 @@ class _IsbnScannerPageState extends State<IsbnScannerPage> {
     }
   }
 
-  /// Redémarre le lecteur après un retour de navigation (ex. CoverPhotoPage).
-  /// Reporte le start() au prochain frame + court délai pour que la caméra
-  /// libérée par l'écran précédent soit bien disponible.
+  /// Redémarre le lecteur après un retour de navigation (ex. [CoverPhotoPage] avec le package `camera`).
+  /// Stop explicite + délai : après le dos, le capteur est encore souvent verrouillé quelques centaines de ms.
+  Future<void> _restartMobileScannerAfterCameraHandoff() async {
+    if (!mounted) return;
+    try {
+      await _controller.stop();
+    } catch (_) {}
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (!mounted) return;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        await _controller.start();
+        return;
+      } catch (_) {
+        if (attempt == 0) {
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+        }
+      }
+    }
+  }
+
   void _resumeScannerAfterReturn() {
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      await Future.delayed(const Duration(milliseconds: 350));
-      if (!mounted) return;
-      await _controller.start();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_restartMobileScannerAfterCameraHandoff());
     });
   }
 

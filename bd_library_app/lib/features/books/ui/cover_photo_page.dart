@@ -237,8 +237,8 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
           _capturedImage = null;
           _isProcessing = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Couverture enregistrée. Prenez maintenant le dos du livre.')),
+        _showTopPhaseBanner(
+          'Couverture enregistrée. Prenez maintenant le dos du livre.',
         );
       } else {
         setState(() => _isProcessing = false);
@@ -264,6 +264,28 @@ class _CoverPhotoPageState extends State<CoverPhotoPage> {
     if (needCamera) {
       unawaited(_initCamera());
     }
+  }
+
+  /// Bannière sous l’AppBar (haut de l’écran), pour ne pas masquer le bouton « Prendre la photo » en bas.
+  void _showTopPhaseBanner(String message) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearMaterialBanners();
+    messenger.showMaterialBanner(
+      MaterialBanner(
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => messenger.hideCurrentMaterialBanner(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+    unawaited(Future<void>.delayed(const Duration(seconds: 5), () {
+      if (!mounted) return;
+      messenger.hideCurrentMaterialBanner();
+    }));
   }
 
   Future<void> _toggleTorch() async {
