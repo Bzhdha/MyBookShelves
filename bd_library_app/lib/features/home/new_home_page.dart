@@ -118,7 +118,7 @@ isDense:true,contentPadding:EdgeInsets.zero,
 suffixIcon:Row(mainAxisSize:MainAxisSize.min,children:[
 IconButton(icon:Icon(_sl?Icons.mic:Icons.mic_none,color:_sl?kYellow:const Color(0xFF888888),size:18),onPressed:_voice,padding:EdgeInsets.zero,constraints:const BoxConstraints(minWidth:30,minHeight:30)),
 if(_sq.isNotEmpty)IconButton(icon:const Icon(Icons.clear,color:Color(0xFF888888),size:16),onPressed:()=>_sc.clear(),padding:EdgeInsets.zero,constraints:const BoxConstraints(minWidth:30,minHeight:30)),
-]))),
+])))),
 ]),
 ),
 ]),

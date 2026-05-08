@@ -57,7 +57,7 @@ padding:const EdgeInsets.symmetric(horizontal:10,vertical:4),
 decoration:BoxDecoration(color:kYellow,border:Border.all(color:kInk,width:2)),
 child:Text('${_cur(page)} / $_n',style:tBebas(14,c:kInk,ls:1)));
 })),
-]));
+]))]);
 }
 
 Widget _tile(Book b){
