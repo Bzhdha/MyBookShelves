@@ -81,6 +81,7 @@ backgroundColor:kInk,
 drawer:_buildDrawer(c),
 body:Column(children:[
 SafeArea(bottom:false,child:_buildHeader(c)),
+const ReadingActiveBanner(),
 Expanded(child:_sq.isEmpty?_buildHome(c):_buildSearch(c)),
 ]),
 bottomNavigationBar:_buildBottomNav(c),
@@ -127,7 +128,6 @@ Widget _buildHome(BuildContext c){
 return RefreshIndicator(color:kYellow,backgroundColor:kInk,onRefresh:_load,
 child:SingleChildScrollView(physics:const AlwaysScrollableScrollPhysics(),padding:const EdgeInsets.only(bottom:20),
 child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-const ReadingActiveBanner(),
 if(_inProg.isNotEmpty)...[
 _secLabel('Reprendre la lecture'),
 Padding(padding:const EdgeInsets.symmetric(horizontal:16),child:_ContinuePanel(books:_inProg.map((e)=>e.$1).toList(),onTap:(b)=>Navigator.push(c,MaterialPageRoute(builder:(_)=>ResumeReadingSessionPage(bookId:b.id))))),
