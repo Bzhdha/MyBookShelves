@@ -35,6 +35,46 @@ class _ImportedLibrariesListPageState extends State<ImportedLibrariesListPage> {
     });
   }
 
+  String _fmt(DateTime d) => '${d.day}/${d.month}/${d.year}';
+
+  Future<void> _syncFriendLibrary(ImportedLibraryEntry entry) async {
+    final db = context.read<AppDb>();
+    final transfer = LibraryTransferService(db);
+    final store = context.read<ImportedLibraryStore>();
+
+    final file = await transfer.pickLibraryFile();
+    if (file == null || !mounted) return;
+
+    final newLib = await transfer.readLibraryFromFile(file);
+    if (newLib == null || !mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fichier invalide ou illisible')));
+      return;
+    }
+
+    final oldLib = await store.getImportedLibrary(entry.id);
+    final diff = oldLib != null ? computeSyncDiff(oldLib, newLib) : null;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Synchroniser « ${entry.name} » ?'),
+        content: diff != null
+            ? Text('${diff.added} livre(s) ajouté(s)\n${diff.removed} supprimé(s)\n${diff.updated} mis à jour')
+            : const Text('La bibliothèque sera remplacée par le nouveau fichier.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Synchroniser')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    await store.updateImportedLibrary(entry.id, newLib);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bibliothèque synchronisée')));
+    await _load();
+  }
+
   Future<void> _importFriendLibrary() async {
     final db = context.read<AppDb>();
     final transfer = LibraryTransferService(db);
@@ -134,11 +174,18 @@ class _ImportedLibrariesListPageState extends State<ImportedLibrariesListPage> {
                       ),
                       title: Text(e.name),
                       subtitle: Text(
-                        'Importé le ${e.importedAt.day}/${e.importedAt.month}/${e.importedAt.year}',
+                        e.lastSyncedAt != null
+                            ? 'Importé le ${_fmt(e.importedAt)} · Synchro le ${_fmt(e.lastSyncedAt!)}'
+                            : 'Importé le ${_fmt(e.importedAt)}',
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          IconButton(
+                            icon: const Icon(Icons.sync),
+                            tooltip: 'Synchroniser',
+                            onPressed: () => _syncFriendLibrary(e),
+                          ),
                           IconButton(
                             icon: const Icon(Icons.visibility),
                             tooltip: 'Consulter',
