@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/app_theme.dart';
 import '../../db/app_db.dart';
 import '../books/domain/book_service.dart';
 import '../books/ui/book_detail_page.dart';
@@ -11,6 +12,9 @@ import '../reading/domain/reading_session_store.dart';
 import '../reading/ui/reading_active_banner.dart';
 import '../reading/ui/start_reading_session_page.dart';
 import '../reading/ui/resume_reading_session_page.dart';
+import '../reading/ui/reading_status_page.dart';
+import '../reading/ui/reading_stats_page.dart';
+import '../reading/ui/reading_badges_page.dart';
 import 'book_carousel.dart';
 import 'series_alerts_section.dart';
 import 'marketplace_search.dart';
@@ -22,30 +26,18 @@ import '../users/ui/users_page.dart';
 import '../books/ui/add_book_page.dart';
 import '../shelves/domain/shelf_service.dart';
 import '../shelves/ui/shelves_page.dart';
-import '../reading/ui/reading_status_page.dart';
 import '../reading/ui/reading_progress_page.dart';
 import '../reading/ui/reading_goals_page.dart';
 import '../reading/ui/reading_history_page.dart';
-import '../reading/ui/reading_stats_page.dart';
-import '../reading/ui/reading_badges_page.dart';
 import '../reading/domain/reading_badge_evaluator.dart';
 import '../settings/data/app_lock_store.dart';
 import '../settings/ui/api_key_page.dart';
 import '../settings/ui/scan_settings_page.dart';
 import '../logs/ui/logs_page.dart';
 
-/// Groupe étagère parente + ses sous-étagères pour l'affichage home.
-class _ShelfGroup {
-  final Shelf parent;
-  final List<Book> directBooks;
-  final List<(Shelf, List<Book>)> children;
-  _ShelfGroup({required this.parent, required this.directBooks, required this.children});
-}
+class _ShelfGroup{final Shelf parent;final List<Book> directBooks;final List<(Shelf,List<Book>)> children;_ShelfGroup({required this.parent,required this.directBooks,required this.children});}
 
-class NewHomePage extends StatefulWidget{
-const NewHomePage({super.key});
-@override State<NewHomePage> createState()=>_NHPState();
-}
+class NewHomePage extends StatefulWidget{const NewHomePage({super.key});@override State<NewHomePage> createState()=>_NHPState();}
 class _NHPState extends State<NewHomePage> with WidgetsBindingObserver{
 final _sc=TextEditingController();String _sq='';final _sp=SpeechDictation();bool _sl=false;
 Book? _lastRead;List<(Book,ReadingProgressRow)> _inProg=[];List<(SeriesData,List<int>)> _missing=[];
@@ -53,9 +45,9 @@ List<_ShelfGroup> _shelfGroups=[];List<Book> _allBooks=[];List<Book> _unclassifi
 Timer? _debounce;
 
 @override void initState(){super.initState();WidgetsBinding.instance.addObserver(this);
-_sc.addListener(_onSearchChanged);_sp.initialize();
+_sc.addListener(_onSearch);_sp.initialize();
 WidgetsBinding.instance.addPostFrameCallback((_){if(mounted){context.read<ReadingSessionStore>().load();_load();}});}
-void _onSearchChanged(){_debounce?.cancel();_debounce=Timer(const Duration(milliseconds:400),(){if(mounted)setState((){_sq=_sc.text.trim();});});}
+void _onSearch(){_debounce?.cancel();_debounce=Timer(const Duration(milliseconds:400),(){if(mounted)setState((){_sq=_sc.text.trim();});});}
 @override void dispose(){_debounce?.cancel();WidgetsBinding.instance.removeObserver(this);_sc.dispose();super.dispose();}
 @override void didChangeAppLifecycleState(AppLifecycleState s){if(s==AppLifecycleState.resumed&&mounted){context.read<ReadingSessionStore>().load();_load();}}
 
@@ -64,116 +56,292 @@ if(!mounted)return;
 final rr=context.read<ReadingRepository>();final db=context.read<AppDb>();
 await ReadingBadgeEvaluator(db).syncMilestoneBadgesFromProgress();
 if(!mounted)return;
-final shelfService=context.read<ShelfService>();
+final ss=context.read<ShelfService>();
 final lr=await rr.lastFinishedBook();final ip=await rr.booksInProgress();final ms=await rr.seriesWithMissingVolumes();
-final roots=await shelfService.getRootShelves();
+final roots=await ss.getRootShelves();
 final groups=<_ShelfGroup>[];
 for(final root in roots){
-  final direct=await shelfService.getBooksByShelf(root.id);
-  final children=await shelfService.getChildShelves(root.id);
-  final childData=<(Shelf,List<Book>)>[];
-  for(final child in children){childData.add((child,await shelfService.getBooksByShelf(child.id)));}
-  groups.add(_ShelfGroup(parent:root,directBooks:direct,children:childData));
-}
+final direct=await ss.getBooksByShelf(root.id);final children=await ss.getChildShelves(root.id);
+final childData=<(Shelf,List<Book>)>[];
+for(final child in children){childData.add((child,await ss.getBooksByShelf(child.id)));}
+groups.add(_ShelfGroup(parent:root,directBooks:direct,children:childData));}
 final ab=await db.getAllBooks();final uc=await db.getUnclassifiedBooks();
-if(mounted)setState((){_lastRead=lr;_inProg=ip;_missing=ms;_shelfGroups=groups;_allBooks=ab;_unclassified=uc;});
-}
+if(mounted)setState((){_lastRead=lr;_inProg=ip;_missing=ms;_shelfGroups=groups;_allBooks=ab;_unclassified=uc;});}
 
 Future<void> _voice()async{
 if(_sl){await _sp.stop();if(mounted)setState((){_sl=false;});return;}
 final ok=await _sp.initialize();if(!ok){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Micro indisponible')));return;}
 if(mounted)setState((){_sl=true;});
 await _sp.startListening(baseText:'',onText:(t){_sc.text=t;_sc.selection=TextSelection.collapsed(offset:_sc.text.length);});
-if(mounted)setState((){_sl=false;});
-}
+if(mounted)setState((){_sl=false;});}
 
 @override Widget build(BuildContext c){
-final bs=context.read<BookService>();
-return Scaffold(appBar:AppBar(title:const Text('Bibliothèque BD')),drawer:_drawer(c),
-body:_sq.isEmpty?_home(c):_search(c,bs),
-floatingActionButton:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.end,children:[
-FloatingActionButton.small(heroTag:'fab_read',tooltip:'Séance lecture',onPressed:(){Navigator.push(c,MaterialPageRoute(builder:(_)=>const StartReadingSessionPage()));},child:const Icon(Icons.auto_stories)),
-const SizedBox(height:12),FloatingActionButton(heroTag:'fab_scan',onPressed:(){Navigator.push(c,MaterialPageRoute(builder:(_)=>const IsbnScannerPage()));},child:const Icon(Icons.qr_code_scanner))]));
-}
+return Scaffold(
+backgroundColor:kInk,
+drawer:_buildDrawer(c),
+body:Column(children:[
+SafeArea(bottom:false,child:_buildHeader(c)),
+Expanded(child:_sq.isEmpty?_buildHome(c):_buildSearch(c)),
+]),
+bottomNavigationBar:_buildBottomNav(c),
+floatingActionButton:_buildFab(c),
+);}
 
-Widget _home(BuildContext c){
-return RefreshIndicator(onRefresh:_load,child:SingleChildScrollView(physics:const AlwaysScrollableScrollPhysics(),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-const ReadingActiveBanner(),_searchBar(),
-if(_inProg.isNotEmpty)BookCarousel(title:'Reprendre la lecture',books:_inProg.map((e)=>e.$1).toList(),onTap:(b)=>Navigator.push(c,MaterialPageRoute(builder:(_)=>ResumeReadingSessionPage(bookId:b.id)))),
-if(_lastRead!=null)Padding(padding:const EdgeInsets.symmetric(horizontal:16,vertical:8),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('Dernier livre lu',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),const SizedBox(height:8),BookCard(book:_lastRead!,subtitle:'Terminé récemment',onTap:()=>_goBook(c,_lastRead!))])),
-if(_unclassified.isNotEmpty)BookCarousel(title:'À classer',books:_unclassified,onTap:(b)=>_goBook(c,b),trailing:const Icon(Icons.inbox,size:16,color:Colors.orange)),
-..._shelfGroups.expand((g){
-  if(g.children.isEmpty){
-    // Étagère racine sans enfants : carousel direct
-    if(g.directBooks.isEmpty)return<Widget>[];
-    return[BookCarousel(title:g.parent.name,books:g.directBooks,onTap:(b)=>_goBook(c,b),trailing:Container(width:12,height:12,decoration:BoxDecoration(color:_col(g.parent.color),shape:BoxShape.circle)))];
-  }
-  // Étagère racine avec enfants : en-tête + sous-carousels
-  final widgets=<Widget>[];
-  final parentColor=_col(g.parent.color);
-  widgets.add(Padding(padding:const EdgeInsets.fromLTRB(16,16,16,4),child:Row(children:[
-    Container(width:12,height:12,margin:const EdgeInsets.only(right:8),decoration:BoxDecoration(color:parentColor,shape:BoxShape.circle)),
-    Text(g.parent.name,style:const TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
-  ])));
-  // Livres directement dans la catégorie parente
-  if(g.directBooks.isNotEmpty){
-    widgets.add(BookCarousel(title:'Divers',books:g.directBooks,onTap:(b)=>_goBook(c,b),trailing:Container(width:10,height:10,decoration:BoxDecoration(color:parentColor.withOpacity(0.5),shape:BoxShape.circle))));
-  }
-  // Sous-étagères
-  for(final(child,books) in g.children){
-    if(books.isEmpty)continue;
-    widgets.add(BookCarousel(title:child.name,books:books,onTap:(b)=>_goBook(c,b),trailing:Container(width:10,height:10,decoration:BoxDecoration(color:_col(child.color),shape:BoxShape.circle))));
-  }
-  return widgets;
-}),
+// ── HEADER ────────────────────────────────────────────────────────────────────
+Widget _buildHeader(BuildContext c){
+return Container(
+color:kYellow,
+padding:const EdgeInsets.fromLTRB(20,16,20,16),
+child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+Row(children:[
+Builder(builder:(ctx)=>GestureDetector(
+onTap:()=>Scaffold.of(ctx).openDrawer(),
+child:Column(mainAxisSize:MainAxisSize.min,children:[
+_ln(),const SizedBox(height:5),_ln(),const SizedBox(height:5),_ln()]))),
+const SizedBox(width:12),
+Text('Bibliothèque BD',style:tBebas(32,c:kInk)),
+]),
+const SizedBox(height:12),
+Container(
+padding:const EdgeInsets.symmetric(horizontal:14,vertical:8),
+decoration:const BoxDecoration(color:kInk,boxShadow:[BoxShadow(color:Color(0x4D000000),offset:Offset(4,4))]),
+child:Row(children:[
+const Icon(Icons.search,color:kYellow,size:18),
+const SizedBox(width:10),
+Expanded(child:TextField(
+controller:_sc,
+style:tMono(13,c:kPaper,ls:0.5),
+decoration:InputDecoration(
+hintText:'Titre, auteur, ISBN…',
+hintStyle:tMono(13,c:const Color(0xFF666666)),
+isDense:true,contentPadding:EdgeInsets.zero,
+suffixIcon:Row(mainAxisSize:MainAxisSize.min,children:[
+IconButton(icon:Icon(_sl?Icons.mic:Icons.mic_none,color:_sl?kYellow:const Color(0xFF888888),size:18),onPressed:_voice,padding:EdgeInsets.zero,constraints:const BoxConstraints(minWidth:30,minHeight:30)),
+if(_sq.isNotEmpty)IconButton(icon:const Icon(Icons.clear,color:Color(0xFF888888),size:16),onPressed:()=>_sc.clear(),padding:EdgeInsets.zero,constraints:const BoxConstraints(minWidth:30,minHeight:30)),
+]))),
+]),
+),
+]),
+);}
+Widget _ln()=>Container(width:28,height:3,color:kInk);
+
+// ── HOME CONTENT ──────────────────────────────────────────────────────────────
+Widget _buildHome(BuildContext c){
+return RefreshIndicator(color:kYellow,backgroundColor:kInk,onRefresh:_load,
+child:SingleChildScrollView(physics:const AlwaysScrollableScrollPhysics(),padding:const EdgeInsets.only(bottom:20),
+child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+const ReadingActiveBanner(),
+if(_inProg.isNotEmpty)...[
+_secLabel('Reprendre la lecture'),
+Padding(padding:const EdgeInsets.symmetric(horizontal:16),child:_ContinuePanel(books:_inProg.map((e)=>e.$1).toList(),onTap:(b)=>Navigator.push(c,MaterialPageRoute(builder:(_)=>ResumeReadingSessionPage(bookId:b.id))))),
+],
+if(_lastRead!=null)...[
+_secLabel('Dernier livre lu'),
+Padding(padding:const EdgeInsets.symmetric(horizontal:16),child:_LastReadCard(book:_lastRead!,onTap:()=>_goBook(c,_lastRead!))),
+],
+if(_unclassified.isNotEmpty)...[
+Padding(padding:const EdgeInsets.fromLTRB(16,24,16,12),child:Row(children:[
+Text('Livres à classer'.toUpperCase(),style:tBebas(11,c:kMuted,ls:4)),
+const Spacer(),
+Container(padding:const EdgeInsets.symmetric(horizontal:8,vertical:2),color:kRed,
+child:Text('${_unclassified.length} ●',style:tBebas(12,c:kPaper,ls:1))),
+])),
+Padding(padding:const EdgeInsets.symmetric(horizontal:16),child:_ClassifyGrid(books:_unclassified,onTap:(b)=>_goBook(c,b))),
+],
+..._shelfGroups.expand((g)=>_shelfWidgets(c,g)),
 SeriesAlertsSection(data:_missing),
 MarketplaceSearch(books:_allBooks),
-const SizedBox(height:100)
-])));
-}
+const SizedBox(height:20),
+])));}
 
-Widget _search(BuildContext c,BookService bs){
-return FutureBuilder<List<(Book,String?)>>(future:bs.searchBooksWithSeriesNames(_sq),builder:(c,s){
-if(!s.hasData)return const Center(child:CircularProgressIndicator());
-final items=s.data!;if(items.isEmpty)return const Center(child:Text('Aucun résultat'));
-return ListView(children:[_searchBar(),...items.map((e){final b=e.$1;final sn=e.$2;
-return ListTile(leading:_cov(b),title:Text(b.title),subtitle:sn!=null?Text(sn):null,onTap:()=>_goBook(c,b),trailing:IconButton(icon:const Icon(Icons.shopping_cart),onPressed:()=>searchBookOnLeboncoin(b)));})]);});
-}
+List<Widget> _shelfWidgets(BuildContext c,_ShelfGroup g){
+if(g.children.isEmpty){
+if(g.directBooks.isEmpty)return[];
+return[BookCarousel(title:g.parent.name,books:g.directBooks,onTap:(b)=>_goBook(c,b),trailing:_dot(g.parent.color))];}
+final ws=<Widget>[];
+ws.add(Padding(padding:const EdgeInsets.fromLTRB(16,16,16,0),child:Row(children:[
+_dot(g.parent.color),const SizedBox(width:8),
+Text(g.parent.name.toUpperCase(),style:tBebas(18))])));
+if(g.directBooks.isNotEmpty)ws.add(BookCarousel(title:'Divers',books:g.directBooks,onTap:(b)=>_goBook(c,b),trailing:_dot(g.parent.color,small:true)));
+for(final(child,books) in g.children){if(books.isEmpty)continue;ws.add(BookCarousel(title:child.name,books:books,onTap:(b)=>_goBook(c,b),trailing:_dot(child.color,small:true)));}
+return ws;}
 
-Widget _searchBar()=>Padding(padding:const EdgeInsets.symmetric(horizontal:16,vertical:8),child:TextField(controller:_sc,decoration:InputDecoration(hintText:'Rechercher...',prefixIcon:const Icon(Icons.search),suffixIcon:Row(mainAxisSize:MainAxisSize.min,children:[IconButton(icon:Icon(_sl?Icons.mic:Icons.mic_none,color:_sl?Theme.of(context).colorScheme.primary:null),onPressed:_voice),if(_sq.isNotEmpty)IconButton(icon:const Icon(Icons.clear),onPressed:()=>_sc.clear())]),border:OutlineInputBorder(borderRadius:BorderRadius.circular(12)),filled:true)));
+// ── SEARCH ────────────────────────────────────────────────────────────────────
+Widget _buildSearch(BuildContext c){
+final bs=context.read<BookService>();
+return FutureBuilder<List<(Book,String?)>>(
+future:bs.searchBooksWithSeriesNames(_sq),
+builder:(c,s){
+if(!s.hasData)return const Center(child:CircularProgressIndicator(color:kYellow));
+final items=s.data!;
+if(items.isEmpty)return Center(child:Text('Aucun résultat',style:tBebas(18,c:kMuted)));
+return ListView(children:items.map((e)=>_searchTile(e.$1,e.$2,c)).toList());});}
 
-Widget _cov(Book b){final p=b.coverLocalPath;final h=p!=null&&p.isNotEmpty;return SizedBox(width:40,height:56,child:ClipRRect(borderRadius:BorderRadius.circular(4),child:h?Image.file(File(p),fit:BoxFit.cover,errorBuilder:(_,__,___)=>_ph()):_ph()));}
-static Widget _ph()=>Container(color:Colors.grey.shade300,child:const Icon(Icons.menu_book,size:28));
-Color _col(String hex){try{return Color(int.parse(hex.replaceFirst('#','0xff')));}catch(_){return Colors.blue;}}
-Future<void> _goBook(BuildContext c,Book b)async{
-await Navigator.push<void>(c,MaterialPageRoute(builder:(_)=>BookDetailPage(bookId:b.id)));
-if(mounted)await _load();
-}
+Widget _searchTile(Book b,String? sub,BuildContext c){
+return InkWell(onTap:()=>_goBook(c,b),child:Container(
+padding:const EdgeInsets.symmetric(horizontal:16,vertical:12),
+decoration:const BoxDecoration(border:Border(bottom:BorderSide(color:kBorder))),
+child:Row(children:[
+_cov(b),const SizedBox(width:14),
+Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+Text(b.title.isEmpty?'Sans titre':b.title,style:tBebas(18),maxLines:2,overflow:TextOverflow.ellipsis),
+if(sub!=null)Text(sub,style:tSerif(13,c:kMuted,italic:true)),
+])),
+const Icon(Icons.chevron_right,color:kMuted,size:20),
+])));}
 
-Widget _drawer(BuildContext c)=>Drawer(child:ListView(padding:EdgeInsets.zero,children:[
-const DrawerHeader(decoration:BoxDecoration(color:Colors.blue),child:Text('Bibliothèque BD',style:TextStyle(color:Colors.white,fontSize:24))),
-ExpansionTile(leading:const Icon(Icons.upload),title:const Text('Importer'),children:[
-ListTile(leading:const Icon(Icons.archive),title:const Text('ZIP complet'),subtitle:const Text('Couvertures + lecture'),onTap:()async{Navigator.pop(c);final db=c.read<AppDb>();final t=LibraryTransferService(db);try{final f=await t.pickZipFile();if(f==null||!c.mounted)return;final p=await t.buildImportPlanFromZip(f);if(!c.mounted)return;await Navigator.push<void>(c,MaterialPageRoute(builder:(_)=>ImportReviewPage(plan:p,onApply:(p)async{await t.applyImportPlanFromZip(zipFile:f,plan:p);})));_load();}catch(e){if(c.mounted)ScaffoldMessenger.of(c).showSnackBar(SnackBar(content:Text('Erreur: $e')));}}),
-ListTile(leading:const Icon(Icons.description),title:const Text('JSON'),subtitle:const Text('Métadonnées seules'),onTap:()async{Navigator.pop(c);final db=c.read<AppDb>();final t=LibraryTransferService(db);try{final f=await t.pickJsonFile();if(f==null||!c.mounted)return;final p=await t.buildImportPlanFromJson(f);if(!c.mounted)return;await Navigator.push<void>(c,MaterialPageRoute(builder:(_)=>ImportReviewPage(plan:p,onApply:(p)async{await t.applyImportPlanFromJson(p);})));_load();}catch(e){if(c.mounted)ScaffoldMessenger.of(c).showSnackBar(SnackBar(content:Text('Erreur: $e')));}})]),
-ExpansionTile(leading:const Icon(Icons.download),title:const Text('Exporter'),children:[
-ListTile(leading:const Icon(Icons.archive),title:const Text('ZIP complet'),subtitle:const Text('Couvertures + lecture'),onTap:()async{Navigator.pop(c);final db=c.read<AppDb>();final t=LibraryTransferService(db);try{await t.shareExportZip();}catch(e){if(c.mounted)ScaffoldMessenger.of(c).showSnackBar(SnackBar(content:Text('Erreur: $e')));}}),
-ListTile(leading:const Icon(Icons.description),title:const Text('JSON'),subtitle:const Text('Métadonnées seules'),onTap:()async{Navigator.pop(c);final db=c.read<AppDb>();final t=LibraryTransferService(db);try{await t.shareExportJson();}catch(e){if(c.mounted)ScaffoldMessenger.of(c).showSnackBar(SnackBar(content:Text('Erreur: $e')));}})]),
-ListTile(leading:const Icon(Icons.people_outline),title:const Text('Bibliothèques importées'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ImportedLibrariesListPage()));}),
-ListTile(leading:const Icon(Icons.group),title:const Text('Membres'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const UsersPage()));}),
-ListTile(leading:const Icon(Icons.add),title:const Text('Ajouter livre'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const AddBookPage()));}),
-ListTile(leading:const Icon(Icons.menu_book),title:const Text('Étagères'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ShelvesPage()));}),
-ExpansionTile(leading:const Icon(Icons.auto_stories),title:const Text('Suivi lecture'),children:[
-ListTile(leading:const Icon(Icons.play_circle_outline),title:const Text('Séance'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const StartReadingSessionPage()));}),
-ListTile(leading:const Icon(Icons.label_outline),title:const Text('Statuts'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingStatusPage()));}),
-ListTile(leading:const Icon(Icons.linear_scale),title:const Text('Progression'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingProgressPage()));}),
-ListTile(leading:const Icon(Icons.flag_outlined),title:const Text('Objectifs'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingGoalsPage()));}),
-ListTile(leading:const Icon(Icons.history),title:const Text('Historique'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingHistoryPage()));}),
-ListTile(leading:const Icon(Icons.bar_chart_outlined),title:const Text('Stats'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingStatsPage()));}),
-ListTile(leading:const Icon(Icons.emoji_events_outlined),title:const Text('Badges'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingBadgesPage()));})]),
-ListTile(leading:const Icon(Icons.key),title:const Text('Clés API'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ApiKeyPage()));}),
-ListTile(leading:const Icon(Icons.settings),title:const Text('Paramètres scan'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ScanSettingsPage()));}),
-Consumer<AppLockStore>(builder:(_,st,__)=>SwitchListTile(secondary:const Icon(Icons.lock_outline),title:const Text('Verrou bio'),value:st.enabled,onChanged:(v)=>st.setEnabled(v))),
-const Divider(),
-ListTile(leading:const Icon(Icons.list_alt),title:const Text('Logs'),onTap:(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const LogsPage()));})
+// ── BOTTOM NAV ────────────────────────────────────────────────────────────────
+Widget _buildBottomNav(BuildContext c){
+return Container(
+decoration:const BoxDecoration(color:kPaper,border:Border(top:BorderSide(color:kInk,width:4))),
+child:SafeArea(top:false,child:Row(children:[
+_navItem(Icons.menu_book,'Biblio',true,(){}),
+_navItem(Icons.book,'Lecture',false,()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingStatusPage()))),
+_navItem(Icons.bar_chart,'Stats',false,()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingStatsPage()))),
+_navItem(Icons.emoji_events,'Badges',false,()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingBadgesPage()))),
+])));}
+
+Widget _navItem(IconData icon,String label,bool active,VoidCallback onTap){
+return Expanded(child:InkWell(onTap:onTap,child:Container(
+padding:const EdgeInsets.symmetric(vertical:12),
+decoration:BoxDecoration(color:active?kInk:kPaper,border:const Border(right:BorderSide(color:Color(0xFFE0D8C8),width:2))),
+child:Column(mainAxisSize:MainAxisSize.min,children:[
+Icon(icon,size:20,color:active?kYellow:kInk),
+const SizedBox(height:4),
+Text(label.toUpperCase(),style:tBebas(9,c:active?kYellow:kInk,ls:2)),
+]))));}
+
+// ── FAB ───────────────────────────────────────────────────────────────────────
+Widget _buildFab(BuildContext c){
+return Container(
+width:52,height:52,
+decoration:const BoxDecoration(color:kBlue,border:Border.fromBorderSide(BorderSide(color:kPaper,width:3)),boxShadow:[BoxShadow(color:kInk,offset:Offset(4,4))]),
+child:Material(color:Colors.transparent,child:InkWell(
+onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>const IsbnScannerPage())),
+child:const Icon(Icons.qr_code_scanner,color:kPaper,size:22))));}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+Widget _secLabel(String label){
+return Padding(padding:const EdgeInsets.fromLTRB(16,24,16,12),child:Row(children:[
+Text(label.toUpperCase(),style:tBebas(11,c:kMuted,ls:4)),
+const SizedBox(width:10),
+Expanded(child:Container(height:1,color:kBorder)),
+]));}
+Widget _dot(String hex,{bool small=false}){final s=small?10.0:12.0;return Container(width:s,height:s,decoration:BoxDecoration(color:_col(hex),shape:BoxShape.circle));}
+Widget _cov(Book b){final p=b.coverLocalPath;final h=p!=null&&p.isNotEmpty;return Container(width:40,height:56,decoration:const BoxDecoration(border:Border.fromBorderSide(BorderSide(color:kBorder,width:2))),child:h?Image.file(File(p),fit:BoxFit.cover,errorBuilder:(_,__,___)=>_ph()):_ph());}
+static Widget _ph()=>Container(color:kPanelBg,child:const Icon(Icons.menu_book,size:20,color:kMuted));
+Color _col(String hex){try{return Color(int.parse(hex.replaceFirst('#','0xff')));}catch(_){return kBlue;}}
+Future<void> _goBook(BuildContext c,Book b)async{await Navigator.push<void>(c,MaterialPageRoute(builder:(_)=>BookDetailPage(bookId:b.id)));if(mounted)await _load();}
+
+// ── DRAWER ────────────────────────────────────────────────────────────────────
+Widget _buildDrawer(BuildContext c)=>Drawer(backgroundColor:kPaper,child:ListView(padding:EdgeInsets.zero,children:[
+DrawerHeader(decoration:const BoxDecoration(color:kBlue),child:Text('Bibliothèque BD',style:tBebas(32,c:kPaper,ls:3))),
+_dSec('Bibliothèque'),
+_dExp(Icons.upload,'Importer',[
+_dSub(Icons.archive,'ZIP complet',()async{Navigator.pop(c);final db=c.read<AppDb>();final t=LibraryTransferService(db);try{final f=await t.pickZipFile();if(f==null||!c.mounted)return;final p=await t.buildImportPlanFromZip(f);if(!c.mounted)return;await Navigator.push<void>(c,MaterialPageRoute(builder:(_)=>ImportReviewPage(plan:p,onApply:(p)async{await t.applyImportPlanFromZip(zipFile:f,plan:p);})));_load();}catch(e){if(c.mounted)ScaffoldMessenger.of(c).showSnackBar(SnackBar(content:Text('Erreur: $e')));}}),
+_dSub(Icons.description,'JSON',()async{Navigator.pop(c);final db=c.read<AppDb>();final t=LibraryTransferService(db);try{final f=await t.pickJsonFile();if(f==null||!c.mounted)return;final p=await t.buildImportPlanFromJson(f);if(!c.mounted)return;await Navigator.push<void>(c,MaterialPageRoute(builder:(_)=>ImportReviewPage(plan:p,onApply:(p)async{await t.applyImportPlanFromJson(p);})));_load();}catch(e){if(c.mounted)ScaffoldMessenger.of(c).showSnackBar(SnackBar(content:Text('Erreur: $e')));}})]),
+_dExp(Icons.download,'Exporter',[
+_dSub(Icons.archive,'ZIP complet',()async{Navigator.pop(c);final db=c.read<AppDb>();final t=LibraryTransferService(db);try{await t.shareExportZip();}catch(e){if(c.mounted)ScaffoldMessenger.of(c).showSnackBar(SnackBar(content:Text('Erreur: $e')));}}),
+_dSub(Icons.description,'JSON',()async{Navigator.pop(c);final db=c.read<AppDb>();final t=LibraryTransferService(db);try{await t.shareExportJson();}catch(e){if(c.mounted)ScaffoldMessenger.of(c).showSnackBar(SnackBar(content:Text('Erreur: $e')));}})]),
+_dItem(Icons.people_outline,'Bibliothèques importées',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ImportedLibrariesListPage()));}),
+_dItem(Icons.group,'Membres',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const UsersPage()));}),
+_dItem(Icons.add,'Ajouter un livre',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const AddBookPage()));}),
+_dItem(Icons.menu_book,'Étagères',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ShelvesPage()));}),
+_dSec('Suivi de lecture'),
+_dItem(Icons.play_circle_outline,'Séance',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const StartReadingSessionPage()));}),
+_dItem(Icons.label_outline,'Statuts',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingStatusPage()));}),
+_dItem(Icons.linear_scale,'Progression',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingProgressPage()));}),
+_dItem(Icons.flag_outlined,'Objectifs',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingGoalsPage()));}),
+_dItem(Icons.history,'Historique',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingHistoryPage()));}),
+_dItem(Icons.bar_chart_outlined,'Stats',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingStatsPage()));}),
+_dItem(Icons.emoji_events_outlined,'Badges',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingBadgesPage()));}),
+_dSec('Paramètres'),
+_dItem(Icons.key,'Clés API',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ApiKeyPage()));}),
+_dItem(Icons.settings,'Paramètres scan',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ScanSettingsPage()));}),
+Consumer<AppLockStore>(builder:(_,st,__)=>SwitchListTile(
+secondary:const Icon(Icons.lock_outline,color:kBlue),
+title:Text('Verrou bio',style:tBebas(18,c:kInk,ls:1)),
+value:st.enabled,onChanged:(v)=>st.setEnabled(v),activeColor:kBlue)),
+const Divider(color:Color(0xFFE0D8C8)),
+_dItem(Icons.list_alt,'Logs',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const LogsPage()));}),
 ]));
+
+Widget _dSec(String t)=>Padding(padding:const EdgeInsets.fromLTRB(20,16,20,4),child:Text(t.toUpperCase(),style:tMono(9,c:kMuted,ls:3)));
+Widget _dItem(IconData icon,String label,VoidCallback onTap)=>ListTile(leading:Icon(icon,color:kBlue,size:18),title:Text(label,style:tBebas(18,c:kInk,ls:1)),onTap:onTap,tileColor:kPaper,dense:true,visualDensity:const VisualDensity(vertical:-1));
+Widget _dExp(IconData icon,String label,List<Widget> ch)=>ExpansionTile(leading:Icon(icon,color:kBlue,size:18),title:Text(label,style:tBebas(18,c:kInk,ls:1)),iconColor:kBlue,collapsedIconColor:kBlue,backgroundColor:kPaper,collapsedBackgroundColor:kPaper,children:ch);
+Widget _dSub(IconData icon,String label,VoidCallback onTap)=>ListTile(contentPadding:const EdgeInsets.only(left:56,right:16),leading:Icon(icon,color:kBlue,size:16),title:Text(label,style:tBebas(16,c:kInk,ls:1)),onTap:onTap,tileColor:kPaper,dense:true);
 }
+
+// ── SUBWIDGETS ────────────────────────────────────────────────────────────────
+
+class _ContinuePanel extends StatelessWidget{
+final List<Book> books;final void Function(Book) onTap;
+const _ContinuePanel({required this.books,required this.onTap});
+@override Widget build(BuildContext c){
+final b=books.first;final cp=b.coverLocalPath;final hasCover=cp!=null&&cp.isNotEmpty;
+return GestureDetector(onTap:()=>onTap(b),child:Container(
+decoration:const BoxDecoration(border:Border.fromBorderSide(BorderSide(color:kBorder,width:3))),
+child:Stack(children:[
+SizedBox(width:double.infinity,height:200,child:hasCover
+?Image.file(File(cp),fit:BoxFit.cover,errorBuilder:(_,__,___)=>const _GradCover())
+:const _GradCover()),
+Positioned.fill(child:Container(decoration:const BoxDecoration(gradient:LinearGradient(begin:Alignment.topCenter,end:Alignment.bottomCenter,colors:[Colors.transparent,Color(0xF2000000)],stops:[0.3,1.0])))),
+Positioned(top:12,right:12,child:Container(padding:const EdgeInsets.symmetric(horizontal:10,vertical:4),decoration:BoxDecoration(color:kYellow,border:Border.all(color:kInk,width:2)),child:Text('1 / ${books.length}',style:tBebas(14,c:kInk,ls:1)))),
+Positioned(bottom:0,left:0,right:0,child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+Text(b.title.toUpperCase(),style:tBebas(28),maxLines:2,overflow:TextOverflow.ellipsis),
+const SizedBox(height:4),
+Text('▶ Continuer la lecture',style:tMono(10,c:kYellow,ls:2)),
+]))),
+])));}
+}
+
+class _GradCover extends StatelessWidget{
+const _GradCover();
+@override Widget build(BuildContext c)=>Container(decoration:const BoxDecoration(gradient:LinearGradient(begin:Alignment.topLeft,end:Alignment.bottomRight,colors:[Color(0xFF1a1a2e),Color(0xFF0f3460),Color(0xFF533483)])));}
+
+class _LastReadCard extends StatelessWidget{
+final Book book;final VoidCallback onTap;
+const _LastReadCard({required this.book,required this.onTap});
+@override Widget build(BuildContext c){
+final cp=book.coverLocalPath;final h=cp!=null&&cp.isNotEmpty;
+return GestureDetector(onTap:onTap,child:Container(
+padding:const EdgeInsets.all(14),
+decoration:const BoxDecoration(color:kPanelBg,border:Border(top:BorderSide(color:kBorder,width:3),right:BorderSide(color:kBorder,width:3),bottom:BorderSide(color:kBorder,width:3),left:BorderSide(color:kRed,width:4))),
+child:Row(children:[
+Container(width:60,height:85,decoration:const BoxDecoration(border:Border.fromBorderSide(BorderSide(color:Color(0xFF3A3530),width:2))),child:h?Image.file(File(cp),fit:BoxFit.cover,errorBuilder:(_,__,___)=>_ph()):_ph()),
+const SizedBox(width:14),
+Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+Text('Dernière lecture',style:tMono(9,c:kRed,ls:3)),
+const SizedBox(height:4),
+Text(book.title.isEmpty?'Sans titre':book.title.toUpperCase(),style:tBebas(26),maxLines:2,overflow:TextOverflow.ellipsis),
+const SizedBox(height:4),
+Row(children:[
+Container(width:6,height:6,decoration:BoxDecoration(color:Colors.green,shape:BoxShape.circle,boxShadow:[BoxShadow(color:Colors.green.withValues(alpha:0.6),blurRadius:4)])),
+const SizedBox(width:6),
+Text('Terminé récemment',style:tMono(10)),
+]),
+])),
+])));}
+static Widget _ph()=>Container(color:kPanelBg,child:const Icon(Icons.menu_book,color:kMuted,size:24));}
+
+class _ClassifyGrid extends StatelessWidget{
+final List<Book> books;final void Function(Book) onTap;
+const _ClassifyGrid({required this.books,required this.onTap});
+@override Widget build(BuildContext c){
+final shown=books.take(6).toList();
+return GridView.builder(
+shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),
+gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,childAspectRatio:2/3,crossAxisSpacing:10,mainAxisSpacing:10),
+itemCount:shown.length,
+itemBuilder:(c,i){
+final b=shown[i];final cp=b.coverLocalPath;final h=cp!=null&&cp.isNotEmpty;
+return GestureDetector(onTap:()=>onTap(b),child:Container(
+decoration:const BoxDecoration(border:Border.fromBorderSide(BorderSide(color:kBorder,width:3)),color:kPanelBg),
+child:Stack(children:[
+if(h)Positioned.fill(child:Image.file(File(cp),fit:BoxFit.cover,errorBuilder:(_,__,___)=>_ph())),
+if(!h)_ph(),
+if(b.isbn!=null&&b.isbn!.isNotEmpty)Positioned(bottom:0,left:0,right:0,child:Container(
+padding:const EdgeInsets.symmetric(horizontal:6,vertical:3),color:Colors.black87,
+child:Text('ISBN ${b.isbn}',style:tMono(7,ls:0.5),overflow:TextOverflow.ellipsis))),
+])));});}
+static Widget _ph()=>Center(child:Icon(Icons.menu_book,color:kMuted.withValues(alpha:0.3),size:28));}

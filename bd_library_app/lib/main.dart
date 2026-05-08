@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'core/app_theme.dart';
 
 import 'db/app_db.dart';
 import 'features/books/data/books_repository.dart';
@@ -117,7 +118,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Bibliothèque BD',
-      theme: ThemeData(useMaterial3: true),
+      theme: buildBdTheme(),
       home: const _AppLockGate(),
     );
   }
