@@ -94,10 +94,7 @@ color:kYellow,
 padding:const EdgeInsets.fromLTRB(20,16,20,16),
 child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
 Row(children:[
-Builder(builder:(ctx)=>GestureDetector(
-onTap:()=>Scaffold.of(ctx).openDrawer(),
-child:Column(mainAxisSize:MainAxisSize.min,children:[
-_ln(),const SizedBox(height:5),_ln(),const SizedBox(height:5),_ln()]))),
+Builder(builder:(ctx)=>GestureDetector(behavior:HitTestBehavior.opaque,onTap:()=>Scaffold.of(ctx).openDrawer(),child:Padding(padding:const EdgeInsets.fromLTRB(0,8,12,8),child:Column(mainAxisSize:MainAxisSize.min,children:[_ln(),const SizedBox(height:5),_ln(),const SizedBox(height:5),_ln()])))),
 const SizedBox(width:12),
 Text('Bibliothèque BD',style:tBebas(32,c:kInk)),
 ]),
