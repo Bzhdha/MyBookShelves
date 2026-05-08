@@ -11,12 +11,31 @@ class ImportedLibraryEntry {
   final String id;
   final String name;
   final DateTime importedAt;
+  final DateTime? lastSyncedAt;
 
-  ImportedLibraryEntry({
-    required this.id,
-    required this.name,
-    required this.importedAt,
-  });
+  ImportedLibraryEntry({required this.id, required this.name, required this.importedAt, this.lastSyncedAt});
+}
+
+class LibrarySyncDiff {
+  final int added;
+  final int removed;
+  final int updated;
+  bool get hasChanges => added > 0 || removed > 0 || updated > 0;
+  LibrarySyncDiff({required this.added, required this.removed, required this.updated});
+}
+
+LibrarySyncDiff computeSyncDiff(ExportLibrary oldLib, ExportLibrary newLib) {
+  final oldIds = {for (final b in oldLib.books) b.id};
+  final newIds = {for (final b in newLib.books) b.id};
+  final oldMap = {for (final b in oldLib.books) b.id: b};
+  return LibrarySyncDiff(
+    added: newLib.books.where((b) => !oldIds.contains(b.id)).length,
+    removed: oldLib.books.where((b) => !newIds.contains(b.id)).length,
+    updated: newLib.books.where((b) {
+      final o = oldMap[b.id];
+      return o != null && (o.title != b.title || o.isbn != b.isbn || o.authors != b.authors);
+    }).length,
+  );
 }
 
 /// Stocke les bibliothèques importées (amis) sans les fusionner avec la BDD.
@@ -48,6 +67,7 @@ class ImportedLibraryStore {
                 id: e['id'] as String,
                 name: e['name'] as String,
                 importedAt: DateTime.parse(e['importedAt'] as String),
+                lastSyncedAt: e['lastSyncedAt'] != null ? DateTime.parse(e['lastSyncedAt'] as String) : null,
               ))
           .toList();
     } catch (_) {
@@ -62,6 +82,7 @@ class ImportedLibraryStore {
               'id': e.id,
               'name': e.name,
               'importedAt': e.importedAt.toIso8601String(),
+              'lastSyncedAt': e.lastSyncedAt?.toIso8601String(),
             })
         .toList()));
   }
@@ -100,6 +121,19 @@ class ImportedLibraryStore {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Met à jour le contenu d'une bibliothèque importée existante et enregistre la date de synchro.
+  Future<void> updateImportedLibrary(String id, ExportLibrary lib) async {
+    final dir = await _getDir();
+    final file = File(p.join(dir.path, '$id.json'));
+    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(lib.toJson()));
+    final entries = await _readIndex();
+    final idx = entries.indexWhere((e) => e.id == id);
+    if (idx == -1) return;
+    final old = entries[idx];
+    entries[idx] = ImportedLibraryEntry(id: old.id, name: old.name, importedAt: old.importedAt, lastSyncedAt: DateTime.now());
+    await _writeIndex(entries);
   }
 
   /// Supprime une bibliothèque importée.
