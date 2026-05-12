@@ -205,14 +205,12 @@ class _EditBookPageState extends State<EditBookPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Modifier le livre'),
-        actions: [
-          TextButton(
-            onPressed: _save,
-            child: const Text('Enregistrer'),
-          ),
-        ],
+      appBar: AppBar(title: const Text('Modifier le livre')),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: FilledButton(onPressed: _save, child: const Text('Enregistrer')),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
