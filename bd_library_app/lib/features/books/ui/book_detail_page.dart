@@ -17,6 +17,7 @@ import '../../reading/ui/reading_session_flow.dart';
 import 'copy_form_page.dart';
 import 'cover_ocr_zones_page.dart';
 import 'cover_photo_page.dart';
+import 'cover_search_sheet.dart';
 import 'edit_book_page.dart';
 import 'metadata_search_sheet.dart';
 import '../../users/ui/copy_my_review_page.dart';
@@ -433,6 +434,14 @@ class _BookDetailPageState extends State<BookDetailPage> {
           spacing: 8,
           runSpacing: 4,
           children: [
+            TextButton.icon(
+              icon: const Icon(Icons.image_search, size: 18),
+              label: const Text('Rechercher couverture en ligne'),
+              onPressed: () async {
+                final applied = await CoverSearchSheet.show(context, book!);
+                if (mounted && applied == true) await _load();
+              },
+            ),
             TextButton.icon(
               icon: const Icon(Icons.photo_camera, size: 18),
               label: const Text('Modifier couverture'),
