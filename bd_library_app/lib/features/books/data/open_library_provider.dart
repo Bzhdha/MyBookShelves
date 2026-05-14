@@ -1,110 +1,66 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:html/parser.dart' as html_parser;
 import '../../../core/app_logger.dart';
 import '../../../models/bd_metadata.dart';
 
 class OpenLibraryProvider {
   OpenLibraryProvider({this.logger});
-
   final AppLogger? logger;
 
-  Future<BdMetadata?> fetchByIsbn(String isbn13) async {
+  Future<BdMetadata?> fetchByIsbn(String isbn) async {
     try {
-      final uri = Uri.parse(
-        'https://isbndb.com/book/$isbn13',
-      );
+      final r = await http.get(
+        Uri.parse('https://openlibrary.org/api/books?bibkeys=ISBN:$isbn&format=json&jscmd=data'),
+        headers: {'User-Agent': 'bd_library_app/1.0', 'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 8));
+      if (r.statusCode != 200) return null;
+      final d = jsonDecode(utf8.decode(r.bodyBytes));
+      if (d is! Map || d.isEmpty) return null;
+      final book = d['ISBN:$isbn'];
+      if (book is! Map) return null;
 
-      final response = await http.get(uri, headers: {'User-Agent': 'bd_library_app/1.0', 'Accept': 'text/html,application/xhtml+xml'}).timeout(const Duration(seconds: 5));
-      if (response.statusCode != 200) {
-        logger?.log('OpenLibraryProvider.fetchByIsbn', {'isbn': isbn13, 'error': 'HTTP ${response.statusCode}'});
-        return null;
-      }
+      final title = _ne(book['title'] as String?);
+      if (title == null) return null;
 
-      final doc = html_parser.parse(utf8.decode(response.bodyBytes));
-
-      // Helper: récupère le <td> (texte) à partir d'un label de <th>
-      String? tdTextFor(String thLabel) {
-        final thList = doc.querySelectorAll('table th');
-        for (final th in thList) {
-          if (th.text.trim().toLowerCase() == thLabel.toLowerCase()) {
-            final td = th.parent?.querySelector('td');
-            final text = td?.text.trim();
-            if (text != null && text.isNotEmpty) return text;
-          }
-        }
-        return null;
-      }
-
-      // Title (priorité H1)
-      final h1Title = doc.querySelector('h1.book-title')?.text.trim();
-      final fullTitle = h1Title?.isNotEmpty == true
-          ? h1Title
-          : tdTextFor('Full Title:');
-
-      // Publisher / Publish Date
-      final publisher = tdTextFor('Publisher:');
-      final publishDate = tdTextFor('Publish Date:');
-      final seriesTitle = tdTextFor('Series:');
-
-      // Authors: on préfère prendre le texte des <a> dans le <td>
       List<String>? authors;
-      final thAuthors = doc
-          .querySelectorAll('table th')
-          .where((th) => th.text.trim().toLowerCase() == 'authors:')
-          .cast<dynamic>()
-          .toList();
-
-      if (thAuthors.isNotEmpty) {
-        final th = thAuthors.first;
-        final td = th.parent?.querySelector('td');
-        final aNames = td
-            ?.querySelectorAll('a')
-            .map((a) => a.text.trim())
-            .where((s) => s.isNotEmpty)
-            .toList();
-
-        if (aNames != null && aNames.isNotEmpty) {
-          authors = aNames;
-        } else {
-          // fallback: texte brut du td (au cas où pas de <a>)
-          final raw = td?.text.trim();
-          if (raw != null && raw.isNotEmpty) {
-            authors = [raw];
-          }
-        }
+      if (book['authors'] is List) {
+        final l = (book['authors'] as List)
+            .map((a) => a is Map ? _ne(a['name'] as String?) : null)
+            .where((s) => s != null).cast<String>().toList();
+        if (l.isNotEmpty) authors = l;
       }
 
-      // Si au moins un champ est présent, on retourne un BdMetadata
-      if ((fullTitle == null || fullTitle.isEmpty) &&
-          (publisher == null || publisher.isEmpty) &&
-          (publishDate == null || publishDate.isEmpty) &&
-          (authors == null || authors.isEmpty)) {
-        return null;
+      String? publisher;
+      if (book['publishers'] is List && (book['publishers'] as List).isNotEmpty) {
+        final p = (book['publishers'] as List).first;
+        publisher = _ne(p is Map ? p['name'] as String? : p?.toString());
       }
 
-      final coverUrl = doc.querySelector('.artwork object')?.attributes['data'];
+      String? desc;
+      final n = book['notes'];
+      if (n is String) desc = _ne(n);
+      else if (n is Map) desc = _ne(n['value'] as String?);
 
-      // Extraction du numéro de tome depuis le titre (ex: "Knight Club, Tome 1" ou "Volume 2")
-      String? volumeNumber;
-      if (fullTitle != null && fullTitle.isNotEmpty) {
-        final tomeMatch = RegExp(r'Tome\s*(\d+)', caseSensitive: false).firstMatch(fullTitle);
-        final volMatch = tomeMatch ?? RegExp(r'Volume\s*(\d+)', caseSensitive: false).firstMatch(fullTitle);
-        if (volMatch != null) volumeNumber = volMatch.group(1);
-      }
+      String? cover;
+      if (book['cover'] is Map) cover = _ne((book['cover']['large'] ?? book['cover']['medium'] ?? book['cover']['small']) as String?);
+
+      String? vol;
+      final m = RegExp(r'Tome\s*(\d+)', caseSensitive: false).firstMatch(title);
+      if (m != null) vol = m.group(1);
+
+      String? series;
+      if (book['series'] is List && (book['series'] as List).isNotEmpty) series = _ne((book['series'] as List).first?.toString());
 
       return BdMetadata(
-        title: fullTitle,
-        authors: authors,
-        publisher: publisher,
-        publishedDate: publishDate,
-        coverUrl: coverUrl,
-        volumeNumber: volumeNumber,
-        seriesTitle: seriesTitle?.trim().isNotEmpty == true ? seriesTitle!.trim() : null,
+        title: title, authors: authors, publisher: publisher,
+        publishedDate: _ne(book['publish_date'] as String?),
+        description: desc, coverUrl: cover, volumeNumber: vol, seriesTitle: series,
       );
     } catch (e) {
-      logger?.log('OpenLibraryProvider.fetchByIsbn', {'isbn': isbn13, 'error': e.toString()});
+      logger?.log('OpenLibraryProvider.error', {'isbn': isbn, 'error': e.toString()});
       return null;
     }
   }
+
+  String? _ne(String? s) => (s?.trim().isEmpty ?? true) ? null : s!.trim();
 }

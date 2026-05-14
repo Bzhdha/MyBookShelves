@@ -10,6 +10,9 @@ import 'features/books/data/metadata_service.dart';
 import 'features/books/data/cover_cache_service.dart';
 import 'features/books/data/open_library_provider.dart';
 import 'features/books/data/bdtheque_provider.dart';
+import 'features/books/data/google_books_provider.dart';
+import 'features/books/data/goodreads_provider.dart';
+import 'features/books/data/amazon_provider.dart';
 import 'features/books/data/chatgpt_provider.dart';
 import 'features/books/data/claude_provider.dart';
 import 'features/books/data/mistral_provider.dart';
@@ -65,6 +68,9 @@ Future<void> main() async {
   final metadataService = MetadataService(
     openLibrary: OpenLibraryProvider(logger: appLogger),
     bdTheque: BdThequeProvider(),
+    googleBooks: GoogleBooksProvider(logger: appLogger),
+    goodreads: GoodreadsProvider(logger: appLogger),
+    amazon: AmazonProvider(logger: appLogger),
     llmProviders: [
       ChatGptProvider(llmKeyStore),
       ClaudeProvider(llmKeyStore),
