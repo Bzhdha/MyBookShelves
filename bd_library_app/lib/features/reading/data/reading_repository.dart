@@ -150,4 +150,26 @@ class ReadingRepository {
   }
 
   Future<List<(SeriesData,List<int>)>> seriesWithMissingVolumes()=>_db.getSeriesWithMissingVolumes();
+
+  /// Livres pour un statut, groupés par étagère (thème → sous-thème → alpha).
+  Future<List<({Shelf? parent,Shelf shelf,List<(Book,ReadingProgressRow)>books})>>
+      booksWithProgressForStatusByShelf(int status)async{
+    final allBooks=await _db.getAllBooks();
+    final pMap=<String,ReadingProgressRow>{};
+    for(final b in allBooks)pMap[b.id]=await _db.getOrCreateReadingProgress(b.id);
+    List<(Book,ReadingProgressRow)>flt(List<Book>bs)=>(bs
+        .where((b)=>pMap[b.id]?.status==status)
+        .map((b)=>(b,pMap[b.id]!))
+        .toList()..sort((a,b)=>a.$1.title.compareTo(b.$1.title)));
+    final res=<({Shelf? parent,Shelf shelf,List<(Book,ReadingProgressRow)>books})>[];
+    for(final root in await _db.getRootShelves()){
+      final d=flt(await _db.getBooksByShelf(root.id));
+      if(d.isNotEmpty)res.add((parent:null,shelf:root,books:d));
+      for(final ch in await _db.getChildShelves(root.id)){
+        final bk=flt(await _db.getBooksByShelf(ch.id));
+        if(bk.isNotEmpty)res.add((parent:root,shelf:ch,books:bk));
+      }
+    }
+    return res;
+  }
 }
