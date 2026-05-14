@@ -3,45 +3,48 @@ import '../../../models/bd_metadata.dart';
 import 'bdtheque_provider.dart';
 import 'llm_metadata_provider.dart';
 import 'open_library_provider.dart';
+import 'google_books_provider.dart';
+import 'goodreads_provider.dart';
+import 'amazon_provider.dart';
 
 class MetadataService {
   final OpenLibraryProvider openLibrary;
   final BdThequeProvider bdTheque;
+  final GoogleBooksProvider googleBooks;
+  final GoodreadsProvider goodreads;
+  final AmazonProvider amazon;
   final List<LlmMetadataProvider> llmProviders;
   final AppLogger? logger;
 
   MetadataService({
     required this.openLibrary,
     required this.bdTheque,
+    required this.googleBooks,
+    required this.goodreads,
+    required this.amazon,
     this.llmProviders = const [],
     this.logger,
   });
 
-  /// Indique si au moins un fournisseur LLM a une clé API configurée.
   bool get hasAnyConfiguredLlm => llmProviders.any((p) => p.isConfigured);
 
-  /// Recherche uniquement sur les sources Web (BdTheque, Open Library). Pas de LLM.
   Future<BdMetadata?> enrichFromIsbnWebOnly(String isbn13) async {
     logger?.log('MetadataService.enrichFromIsbnWebOnly', {'isbn': isbn13});
     final results = await Future.wait<BdMetadata?>([
-      _safeFetchBdTheque(isbn13),
-      _safeFetchOpenLibrary(isbn13),
+      _safe(bdTheque.fetchByIsbn, isbn13, 'bdTheque'),
+      _safe(openLibrary.fetchByIsbn, isbn13, 'openLibrary'),
+      _safe(googleBooks.fetchByIsbn, isbn13, 'googleBooks'),
+      _safe(goodreads.fetchByIsbn, isbn13, 'goodreads'),
+      _safe(amazon.fetchByIsbn, isbn13, 'amazon'),
     ]);
-    return _mergeBdFirst(results[0], results[1]);
+    return _mergeAll(results);
   }
 
-  /// Lance une recherche via le premier LLM configuré avec le prompt utilisateur donné.
-  /// Retourne la réponse brute et les métadonnées parsées (si le JSON est valide).
   Future<LlmPromptResult?> enrichFromCustomUserPrompt(String userPrompt) async {
     logger?.log('MetadataService.enrichFromCustomUserPrompt', {'promptLength': userPrompt.length});
-    for (final provider in llmProviders) {
-      if (!provider.isConfigured) continue;
-      try {
-        final result = await provider.fetchWithUserPrompt(userPrompt);
-        if (result != null) return result;
-      } catch (_) {
-        continue;
-      }
+    for (final p in llmProviders) {
+      if (!p.isConfigured) continue;
+      try { final r = await p.fetchWithUserPrompt(userPrompt); if (r != null) return r; } catch (_) {}
     }
     return null;
   }
@@ -49,97 +52,49 @@ class MetadataService {
   Future<BdMetadata?> enrichFromIsbn(String isbn13) async {
     logger?.log('MetadataService.enrichFromIsbn', {'isbn': isbn13});
     final results = await Future.wait<BdMetadata?>([
-      _safeFetchBdTheque(isbn13),
-      _safeFetchOpenLibrary(isbn13),
+      _safe(bdTheque.fetchByIsbn, isbn13, 'bdTheque'),
+      _safe(openLibrary.fetchByIsbn, isbn13, 'openLibrary'),
+      _safe(googleBooks.fetchByIsbn, isbn13, 'googleBooks'),
+      _safe(goodreads.fetchByIsbn, isbn13, 'goodreads'),
+      _safe(amazon.fetchByIsbn, isbn13, 'amazon'),
     ]);
-
-    BdMetadata? bdMeta = results[0];
-    BdMetadata? olMeta = results[1];
-
-    if (bdMeta == null && olMeta == null) {
-      for (final provider in llmProviders) {
-        if (!provider.isConfigured) continue;
-        final meta = await _safeFetchLlm(provider, isbn13);
-        if (meta != null) return meta;
+    final merged = _mergeAll(results);
+    if (merged == null) {
+      for (final p in llmProviders) {
+        if (!p.isConfigured) continue;
+        try { final m = await p.fetchByIsbn(isbn13); if (m != null) return m; } catch (_) {}
       }
       return null;
     }
-
-    return _mergeBdFirst(bdMeta, olMeta);
+    return merged;
   }
 
-  Future<BdMetadata?> _safeFetchLlm(LlmMetadataProvider provider, String isbn) async {
-    logger?.log('MetadataService._safeFetchLlm', {'provider': provider.runtimeType.toString(), 'isbn': isbn});
-    try {
-      return await provider.fetchByIsbn(isbn);
-    } catch (e) {
-      logger?.log('MetadataService._safeFetchLlm.error', {'provider': provider.runtimeType.toString(), 'isbn': isbn, 'error': e.toString()});
-      return null;
-    }
+  Future<BdMetadata?> _safe(Future<BdMetadata?> Function(String) fn, String isbn, String name) async {
+    try { return await fn(isbn); }
+    catch (e) { logger?.log('MetadataService.$name.error', {'isbn': isbn, 'error': e.toString()}); return null; }
   }
 
-  Future<BdMetadata?> _safeFetchBdTheque(String isbn) async {
-    logger?.log('MetadataService._safeFetchBdTheque', {'isbn': isbn});
-    try {
-      return await bdTheque.fetchByIsbn(isbn);
-    } catch (e) {
-      logger?.log('MetadataService._safeFetchBdTheque.error', {'isbn': isbn, 'error': e.toString()});
-      return null;
-    }
-  }
-
-  Future<BdMetadata?> _safeFetchOpenLibrary(String isbn) async {
-    logger?.log('MetadataService._safeFetchOpenLibrary', {'isbn': isbn});
-    try {
-      return await openLibrary.fetchByIsbn(isbn);
-    } catch (e) {
-      logger?.log('MetadataService._safeFetchOpenLibrary.error', {'isbn': isbn, 'error': e.toString()});
-      return null;
-    }
-  }
-
-  BdMetadata _mergeBdFirst(
-    BdMetadata? bd,
-    BdMetadata? ol,
-  ) {
+  BdMetadata? _mergeAll(List<BdMetadata?> results) {
+    if (results.every((r) => r == null)) return null;
     return BdMetadata(
-      title: _pickString(bd?.title, ol?.title),
-
-      authors: _pickAuthors(
-        preferred: bd?.authors,
-        fallback: ol?.authors,
-      ),
-
-      publisher: _pickString(bd?.publisher, ol?.publisher),
-
-      publishedDate: _pickString(bd?.publishedDate, ol?.publishedDate),
-
-      description: _pickString(bd?.description, ol?.description),
-
-      coverUrl: _pickString(bd?.coverUrl, ol?.coverUrl),
-
-      volumeNumber: _pickString(bd?.volumeNumber, ol?.volumeNumber),
-
-      seriesTitle: _pickString(bd?.seriesTitle, ol?.seriesTitle),
+      title: _pick(results.map((r) => r?.title)),
+      authors: _pickAuthors(results.map((r) => r?.authors)),
+      publisher: _pick(results.map((r) => r?.publisher)),
+      publishedDate: _pick(results.map((r) => r?.publishedDate)),
+      description: _pick(results.map((r) => r?.description)),
+      coverUrl: _pick(results.map((r) => r?.coverUrl)),
+      volumeNumber: _pick(results.map((r) => r?.volumeNumber)),
+      seriesTitle: _pick(results.map((r) => r?.seriesTitle)),
     );
   }
 
-  String? _pickString(String? preferred, String? fallback) {
-    if (_isFilled(preferred)) return preferred!.trim();
-    if (_isFilled(fallback)) return fallback!.trim();
+  String? _pick(Iterable<String?> values) {
+    for (final v in values) { if (v != null && v.trim().isNotEmpty) return v.trim(); }
     return null;
   }
 
-  List<String>? _pickAuthors({
-    List<String>? preferred,
-    List<String>? fallback,
-  }) {
-    if (preferred != null && preferred.isNotEmpty) return preferred;
-    if (fallback != null && fallback.isNotEmpty) return fallback;
+  List<String>? _pickAuthors(Iterable<List<String>?> values) {
+    for (final v in values) { if (v != null && v.isNotEmpty) return v; }
     return null;
-  }
-
-  bool _isFilled(String? value) {
-    return value != null && value.trim().isNotEmpty;
   }
 }
