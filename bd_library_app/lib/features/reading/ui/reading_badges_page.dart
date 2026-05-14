@@ -7,24 +7,32 @@ import '../../../core/app_theme.dart';
 import '../../../db/app_db.dart';
 import '../domain/reading_badge_catalog.dart';
 
-class ReadingBadgesPage extends StatelessWidget {
-  const ReadingBadgesPage({super.key});
-
-  static final _dateFmt = DateFormat.yMMMd('fr_FR');
-
-  static const _catalog = [
+const _cats = [
+  ('📖 Jalons de lecture', [
     (ReadingBadgeIds.firstBookEver, '📖'),
     (ReadingBadgeIds.books10, '📚'),
     (ReadingBadgeIds.books25, '🏅'),
     (ReadingBadgeIds.books50, '🥈'),
     (ReadingBadgeIds.books100, '🏆'),
+  ]),
+  ('⚡ Pionniers', [
     (ReadingBadgeIds.pioneerWeek, '⚡'),
     (ReadingBadgeIds.pioneerMonth, '🌙'),
     (ReadingBadgeIds.pioneerYear, '⭐'),
+  ]),
+  ('🎯 Collectionneurs de séries', [
     (ReadingBadgeIds.firstSeriesComplete, '🎯'),
     (ReadingBadgeIds.seriesCollector5, '🎖️'),
     (ReadingBadgeIds.seriesCollector10, '👑'),
-  ];
+  ]),
+];
+
+const _total = 11;
+
+class ReadingBadgesPage extends StatelessWidget {
+  const ReadingBadgesPage({super.key});
+
+  static final _fmt = DateFormat.yMMMd('fr_FR');
 
   @override
   Widget build(BuildContext context) {
@@ -37,91 +45,149 @@ class ReadingBadgesPage extends StatelessWidget {
           if (snap.hasError) return Center(child: Text('Erreur: ${snap.error}', style: const TextStyle(color: kRed)));
           if (!snap.hasData) return const Center(child: CircularProgressIndicator());
           final earned = {for (final r in snap.data!) r.badgeId: r};
-          final unlocked = _catalog.where((e) => earned.containsKey(e.$1)).toList();
-          final locked = _catalog.where((e) => !earned.containsKey(e.$1)).toList();
           return ListView(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             children: [
-              if (unlocked.isNotEmpty) ...[
-                _sectionHeader(ctx, 'Obtenus (${unlocked.length})'),
-                _grid(ctx, unlocked, earned),
-                const SizedBox(height: 16),
-              ],
-              if (locked.isNotEmpty) ...[
-                _sectionHeader(ctx, 'À débloquer (${locked.length})'),
-                _grid(ctx, locked, earned),
-              ],
-              if (unlocked.isEmpty && locked.isEmpty)
-                Center(child: Text('Aucun badge disponible.', style: Theme.of(ctx).textTheme.bodyLarge)),
+              _ProgressBanner(count: earned.length),
+              ..._cats.expand((cat) => [
+                _CatHeader(cat.$1),
+                ...cat.$2.map((b) => _BadgeRow(badgeId: b.$1, emoji: b.$2, row: earned[b.$1], fmt: _fmt)),
+              ]),
             ],
           );
         },
       ),
     );
   }
-
-  Widget _sectionHeader(BuildContext ctx, String label) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 10),
-    child: Text(label, style: tBebas(18, c: kYellow, ls: 2)),
-  );
-
-  Widget _grid(BuildContext ctx, List<(String, String)> items, Map<String, EarnedBadgeRow> earned) =>
-    GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      mainAxisSpacing: 8,
-      crossAxisSpacing: 8,
-      childAspectRatio: 1.05,
-      children: items.map((e) => _BadgeCard(badgeId: e.$1, emoji: e.$2, row: earned[e.$1], dateFmt: _dateFmt)).toList(),
-    );
 }
 
-class _BadgeCard extends StatelessWidget {
-  const _BadgeCard({required this.badgeId, required this.emoji, required this.row, required this.dateFmt});
-  final String badgeId;
-  final String emoji;
+class _ProgressBanner extends StatelessWidget {
+  const _ProgressBanner({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext ctx) {
+    final done = count == _total;
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kPanelBg,
+        border: Border.all(color: done ? kYellow : kBorder, width: done ? 2 : 1),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Text('$count', style: tBebas(52, c: kYellow)),
+          Padding(
+            padding: const EdgeInsets.only(left: 6, top: 8),
+            child: Text('/ $_total\nbadges', style: tSerif(13, c: kMuted)),
+          ),
+          const Spacer(),
+          if (done)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              color: kYellow,
+              child: Text('COMPLET', style: tBebas(14, c: kInk, ls: 2)),
+            ),
+        ]),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.zero,
+          child: LinearProgressIndicator(
+            value: count / _total,
+            backgroundColor: kBorder,
+            valueColor: const AlwaysStoppedAnimation(kYellow),
+            minHeight: 8,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          count == 0
+              ? 'Termine ta première lecture pour débloquer ton premier badge !'
+              : done
+                  ? 'Bravo ! Tu as débloqué tous les badges. Tu es un(e) maître des BD !'
+                  : '${_total - count} badge${_total - count > 1 ? 's' : ''} encore à débloquer — continue à lire !',
+          style: tSerif(12, italic: true, c: count == 0 ? kMuted : kPaper),
+        ),
+      ]),
+    );
+  }
+}
+
+class _CatHeader extends StatelessWidget {
+  const _CatHeader(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext ctx) => Padding(
+    padding: const EdgeInsets.only(top: 20, bottom: 8),
+    child: Text(label, style: tBebas(15, c: kYellow, ls: 2)),
+  );
+}
+
+class _BadgeRow extends StatelessWidget {
+  const _BadgeRow({required this.badgeId, required this.emoji, required this.row, required this.fmt});
+  final String badgeId, emoji;
   final EarnedBadgeRow? row;
-  final DateFormat dateFmt;
+  final DateFormat fmt;
 
   @override
   Widget build(BuildContext ctx) {
     final meta = readingBadgeMeta(badgeId);
-    final earned = row != null;
+    final ok = row != null;
     return Container(
+      margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
         color: kPanelBg,
-        border: Border.all(color: earned ? kYellow : kBorder, width: earned ? 2 : 1),
+        border: Border.all(color: ok ? kYellow : kBorder, width: ok ? 2 : 1),
       ),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Text(emoji, style: const TextStyle(fontSize: 26)),
-            const Spacer(),
-            if (!earned) const Icon(Icons.lock_outline, size: 14, color: kMuted),
-          ]),
-          const SizedBox(height: 6),
-          Text(
-            meta?.title ?? badgeId,
-            style: GoogleFonts.bebasNeue(fontSize: 14, color: earned ? kYellow : kMuted, letterSpacing: 1),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+      child: Row(children: [
+        Container(
+          width: 70,
+          height: 70,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: ok ? kYellow.withValues(alpha: 0.12) : Colors.transparent,
+            border: Border(right: BorderSide(color: ok ? kYellow : kBorder, width: ok ? 2 : 1)),
           ),
-          const SizedBox(height: 4),
-          Expanded(
-            child: Text(
-              meta?.description ?? '',
-              style: tSerif(11, c: earned ? kPaper : kMuted),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
+          child: Opacity(
+            opacity: ok ? 1.0 : 0.25,
+            child: Text(emoji, style: const TextStyle(fontSize: 34)),
           ),
-          if (earned)
-            Text(dateFmt.format(row!.unlockedAt.toLocal()), style: tMono(9, c: kYellow)),
-        ],
-      ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                meta?.title ?? badgeId,
+                style: tBebas(15, c: ok ? kYellow : kMuted, ls: 1),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                meta?.description ?? '',
+                style: tSerif(12, c: ok ? kPaper : kMuted),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (ok) ...[
+                const SizedBox(height: 5),
+                Row(children: [
+                  const Icon(Icons.check_circle, color: kYellow, size: 12),
+                  const SizedBox(width: 4),
+                  Text(fmt.format(row!.unlockedAt.toLocal()), style: tMono(9, c: kYellow)),
+                ]),
+              ],
+            ]),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: ok
+              ? const Icon(Icons.emoji_events, color: kYellow, size: 22)
+              : const Icon(Icons.lock_outline, color: kMuted, size: 20),
+        ),
+      ]),
     );
   }
 }
