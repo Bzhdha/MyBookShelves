@@ -80,19 +80,23 @@ class BookService {
   /// Compte le nombre d'exemplaires pour un livre.
   Future<int> countCopies(String bookId) => _repo.countCopiesForBook(bookId);
 
-  /// Recherche par titre, auteur ou ISBN (même partiel). Retourne les livres avec le nom de série.
+  /// Recherche par titre, auteur, ISBN ou nom de série (partiel). Retourne les livres avec le nom de série.
   Future<List<(Book, String?)>> searchBooksWithSeriesNames(String query) async {
     _logger?.log('BookService.searchBooksWithSeriesNames', {'query': query});
-    final list = await _repo.searchBooks(query);
-    if (list.isEmpty) return [];
+    final q = query.trim();
     final allSeries = await _repo.getSeriesAll();
     final seriesNameById = {for (final s in allSeries) s.id: s.name};
-    return list
-        .map((b) => (
-              b,
-              b.seriesId != null ? seriesNameById[b.seriesId] : null,
-            ))
-        .toList();
+    final byFields = await _repo.searchBooks(q);
+    final lq = q.toLowerCase();
+    final seriesBooks = q.isEmpty ? <Book>[] : [
+      for (final s in allSeries.where((s) => s.name.toLowerCase().contains(lq)))
+        ...await _repo.getBooksBySeries(s.id)
+    ];
+    final seen = <String>{};
+    return [
+      for (final b in [...byFields, ...seriesBooks])
+        if (seen.add(b.id)) (b, b.seriesId != null ? seriesNameById[b.seriesId] : null)
+    ];
   }
 
   Future<void> deleteBook(String id) {
