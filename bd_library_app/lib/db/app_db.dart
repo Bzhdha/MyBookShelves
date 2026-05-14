@@ -53,13 +53,11 @@ class Books extends Table {
   TextColumn get publishedDate => text().nullable()(); // string (API varie)
   TextColumn get coverUrl => text().nullable()();
   TextColumn get coverLocalPath => text().nullable()();
-
-  /// Tags perso (CSV) : "SF, Aventure, Humour"
   TextColumn get tags => text().withDefault(const Constant(''))();
-
-  /// Résumé / synopsis (saisi à la main ou issu d'une recherche IA).
   TextColumn get summary => text().withDefault(const Constant(''))();
-
+  IntColumn get pageCount => integer().nullable()();
+  RealColumn get retailPrice => real().nullable()();
+  DateTimeColumn get registeredAt => dateTime().nullable()();
   DateTimeColumn get updatedAt => dateTime()();
 
   @override
@@ -191,13 +189,11 @@ class AppDb extends _$AppDb {
   AppDb() : super(_openConnection());
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
-  /// Migration strategy (v1 -> … -> v8)
   /// v2: Copies. v3: Shelves + BookShelf. v4: Books.summary. v5: suivi lecture.
-  /// v6: étagère par défaut « Livres à classer » + rattrapage des œuvres sans étagère.
-  /// v7: parentId sur Shelves (hiérarchie 2 niveaux).
-  /// v8: badges de lecture ([EarnedBadges]).
+  /// v6: étagère par défaut. v7: parentId Shelves. v8: EarnedBadges.
+  /// v9: Books.pageCount, retailPrice, registeredAt.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
@@ -231,6 +227,14 @@ class AppDb extends _$AppDb {
           }
           if (from < 8) {
             await m.createTable(earnedBadges);
+          }
+          if (from < 9) {
+            await m.addColumn(books, books.pageCount);
+            await m.addColumn(books, books.retailPrice);
+            await m.addColumn(books, books.registeredAt);
+            await customStatement(
+              'UPDATE books SET registered_at = updated_at WHERE registered_at IS NULL',
+            );
           }
         },
         beforeOpen: (details) async {

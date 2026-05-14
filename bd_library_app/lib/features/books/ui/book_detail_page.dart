@@ -183,10 +183,11 @@ class _BookDetailPageState extends State<BookDetailPage> {
           Text('ISBN: ${book!.isbn ?? "-"}'),
           Text('Auteurs: ${book!.authors}'),
           Text('Éditeur: ${book!.publisher?.trim().isNotEmpty == true ? book!.publisher! : "-"}'),
-          Text(
-            'Série: ${_seriesName?.trim().isNotEmpty == true ? _seriesName! : "-"}',
-          ),
+          Text('Série: ${_seriesName?.trim().isNotEmpty == true ? _seriesName! : "-"}'),
           Text('Tome: ${book!.volumeNumber ?? "-"}'),
+          if (book!.pageCount != null) Text('Pages: ${book!.pageCount}'),
+          if (book!.retailPrice != null) Text('Prix public: ${book!.retailPrice!.toStringAsFixed(2)} €'),
+          if (book!.registeredAt != null) Text('Enregistré le: ${_formatDate(book!.registeredAt!)}'),
           if (_seriesSiblings.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(
@@ -286,6 +287,8 @@ class _BookDetailPageState extends State<BookDetailPage> {
       ),
     );
   }
+
+  String _formatDate(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   Widget _buildReadingSection(BuildContext context) {
     final p = _readingProgress;
