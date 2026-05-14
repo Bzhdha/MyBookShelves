@@ -37,37 +37,84 @@ _StatusList(status:ReadingStatusValues.finished),
 ]));
 }}
 
+Color _shelfCol(String hex){try{return Color(int.parse(hex.replaceFirst('#','0xFF')));}catch(_){return kYellow;}}
+
+abstract class _VItem{Widget build(BuildContext c);}
+
+class _RootHdr extends _VItem{
+_RootHdr(this.s);final Shelf s;
+@override Widget build(BuildContext c){
+  final col=_shelfCol(s.color);
+  return Container(
+    color:col.withValues(alpha:0.12),
+    padding:const EdgeInsets.fromLTRB(16,10,16,8),
+    child:Row(children:[
+      Container(width:3,height:18,color:col),
+      const SizedBox(width:10),
+      Expanded(child:Text(s.name.toUpperCase(),style:tBebas(17,c:kPaper,ls:3))),
+    ]));
+}}
+
+class _SubHdr extends _VItem{
+_SubHdr(this.s);final Shelf s;
+@override Widget build(BuildContext c){
+  final col=_shelfCol(s.color);
+  return Container(
+    color:kPanelBg,
+    padding:const EdgeInsets.fromLTRB(28,7,16,5),
+    child:Row(children:[
+      Container(width:2,height:12,color:col.withValues(alpha:0.7)),
+      const SizedBox(width:8),
+      Text(s.name,style:tMono(10,c:col,ls:1)),
+    ]));
+}}
+
+class _BookRow extends _VItem{
+_BookRow(this.b,this.n);final Book b;final int n;
+@override Widget build(BuildContext c){
+  return InkWell(
+    onTap:()=>Navigator.push<void>(c,MaterialPageRoute(builder:(_)=>BookDetailPage(bookId:b.id))),
+    child:Container(
+      padding:const EdgeInsets.symmetric(horizontal:16,vertical:14),
+      decoration:const BoxDecoration(border:Border(bottom:BorderSide(color:kBorder))),
+      child:Row(children:[
+        Container(width:30,height:30,alignment:Alignment.center,
+          child:Text('$n'.padLeft(2,'0'),style:tBebas(20,c:kBorder,ls:0))),
+        const SizedBox(width:14),
+        Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Text(b.title.isEmpty?'Sans titre':b.title,style:tBebas(20),maxLines:2,overflow:TextOverflow.ellipsis),
+          if(b.authors.trim().isNotEmpty)Text(b.authors,style:tSerif(13,c:kMuted,italic:true)),
+        ])),
+        const Icon(Icons.chevron_right,color:kMuted,size:18),
+      ])));
+}}
+
 class _StatusList extends StatelessWidget{
 const _StatusList({required this.status});
 final int status;
 
 @override Widget build(BuildContext c){
-final repo=c.read<ReadingRepository>();
-return FutureBuilder<List<(Book,ReadingProgressRow)>>(
-future:repo.booksWithProgressForStatus(status),
-builder:(c,s){
-if(!s.hasData)return const Center(child:CircularProgressIndicator(color:kYellow));
-final items=s.data!;
-if(items.isEmpty)return Center(child:Text('Aucun livre (${readingStatusLabel(status)})',style:tBebas(16,c:kMuted),textAlign:TextAlign.center));
-return ListView.builder(
-itemCount:items.length,
-itemBuilder:(c,i){
-final b=items[i].$1;
-return InkWell(
-onTap:()=>Navigator.push<void>(c,MaterialPageRoute(builder:(_)=>BookDetailPage(bookId:b.id))),
-child:Container(
-padding:const EdgeInsets.symmetric(horizontal:16,vertical:14),
-decoration:const BoxDecoration(border:Border(bottom:BorderSide(color:kBorder))),
-child:Row(children:[
-Container(
-width:30,height:30,
-alignment:Alignment.center,
-child:Text('${i+1}'.padLeft(2,'0'),style:tBebas(20,c:kBorder,ls:0)),
-),
-const SizedBox(width:14),
-Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-Text(b.title.isEmpty?'Sans titre':b.title,style:tBebas(20),maxLines:2,overflow:TextOverflow.ellipsis),
-if(b.authors.trim().isNotEmpty)Text(b.authors,style:tSerif(13,c:kMuted,italic:true)),
-])),
-const Icon(Icons.chevron_right,color:kMuted,size:18),
-])));});});}}
+  final repo=c.read<ReadingRepository>();
+  return FutureBuilder<List<({Shelf? parent,Shelf shelf,List<(Book,ReadingProgressRow)>books})>>(
+    future:repo.booksWithProgressForStatusByShelf(status),
+    builder:(c,s){
+      if(!s.hasData)return const Center(child:CircularProgressIndicator(color:kYellow));
+      final secs=s.data!;
+      if(secs.isEmpty)return Center(child:Text('Aucun livre (${readingStatusLabel(status)})',style:tBebas(16,c:kMuted),textAlign:TextAlign.center));
+      final items=<_VItem>[];
+      String? lastRootId;
+      for(final sec in secs){
+        if(sec.parent!=null){
+          if(lastRootId!=sec.parent!.id){items.add(_RootHdr(sec.parent!));lastRootId=sec.parent!.id;}
+          items.add(_SubHdr(sec.shelf));
+        }else{
+          items.add(_RootHdr(sec.shelf));
+          lastRootId=sec.shelf.id;
+        }
+        for(int j=0;j<sec.books.length;j++)items.add(_BookRow(sec.books[j].$1,j+1));
+      }
+      return ListView.builder(
+        itemCount:items.length,
+        itemBuilder:(c,i)=>items[i].build(c));
+    });
+}}
