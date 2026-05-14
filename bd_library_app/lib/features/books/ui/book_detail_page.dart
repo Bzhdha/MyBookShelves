@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +10,10 @@ import '../data/cover_cache_service.dart';
 import '../domain/book_service.dart';
 import '../../shelves/domain/shelf_service.dart';
 import '../../users/domain/active_user_store.dart';
+import '../../reading/data/reading_repository.dart';
+import '../../reading/domain/reading_session_store.dart';
+import '../../reading/ui/end_reading_session_sheet.dart';
+import '../../reading/ui/reading_session_flow.dart';
 import 'copy_form_page.dart';
 import 'cover_ocr_zones_page.dart';
 import 'cover_photo_page.dart';
@@ -36,7 +41,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
   String? _backCoverPath;
   Map<String, UserCopyMeta> _copyMetas = {};
   Map<String, String> _userNameById = {};
-  /// Incrémenté à chaque remplacement de photo pour forcer le rechargement (éviter le cache Image.file).
+  ReadingProgressRow? _readingProgress;
   int _coverImageVersion = 0;
   int _backImageVersion = 0;
 
@@ -62,6 +67,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
     final allShelves = await shelfService.getAllShelves();
     final shelves = allShelves.where((s) => shelfIds.contains(s.id)).toList();
     final backPath = await coverCache.backCoverPathForBook(widget.bookId);
+    final progress = await context.read<ReadingRepository>().getOrCreateProgress(widget.bookId);
 
     Map<String, UserCopyMeta> copyMetas = {};
     Map<String, String> userNameById = {};
@@ -80,6 +86,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
       copies = c;
       bookShelves = shelves;
       _backCoverPath = backPath;
+      _readingProgress = progress;
       _copyMetas = copyMetas;
       _userNameById = userNameById;
     });
@@ -168,6 +175,8 @@ class _BookDetailPageState extends State<BookDetailPage> {
         ),
         children: [
           _buildCoversSection(context),
+          const SizedBox(height: 16),
+          _buildReadingSection(context),
           const SizedBox(height: 16),
           _buildMetadataSearchSection(context),
           const SizedBox(height: 16),
@@ -276,6 +285,111 @@ class _BookDetailPageState extends State<BookDetailPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildReadingSection(BuildContext context) {
+    final p = _readingProgress;
+    if (p == null) return const SizedBox.shrink();
+    return Consumer<ReadingSessionStore>(builder: (ctx, store, _) {
+      final isActiveHere = store.activeSession?.bookId == widget.bookId;
+      final s = p.status;
+      final (label, color, icon) = s == ReadingStatusValues.finished
+          ? ('Terminé', Colors.green, Icons.check_circle)
+          : s == ReadingStatusValues.inProgress
+              ? ('En cours', Colors.blue, Icons.auto_stories)
+              : ('À lire', Colors.grey, Icons.bookmark_border);
+      String? prog;
+      if (s != ReadingStatusValues.toRead) {
+        if (p.usePercentage) {
+          prog = '${p.progressPercent ?? 0} %';
+        } else if ((p.totalPages ?? 0) > 0) {
+          prog = 'Page ${p.currentPage} / ${p.totalPages}';
+        } else if (p.currentPage > 0) {
+          prog = 'Page ${p.currentPage}';
+        }
+      }
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Lecture', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Row(children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+          if (prog != null) ...[
+            const SizedBox(width: 12),
+            Text(prog, style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ]),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 4, children: [
+          if (s == ReadingStatusValues.toRead && !isActiveHere)
+            FilledButton.icon(
+              icon: const Icon(Icons.play_arrow, size: 18),
+              label: const Text('Commencer la lecture'),
+              onPressed: () => _startReading(context),
+            ),
+          if (s == ReadingStatusValues.inProgress && !isActiveHere)
+            FilledButton.icon(
+              icon: const Icon(Icons.play_arrow, size: 18),
+              label: const Text('Reprendre la lecture'),
+              onPressed: () => _startReading(context),
+            ),
+          if (isActiveHere)
+            FilledButton.icon(
+              icon: const Icon(Icons.stop, size: 18),
+              label: const Text('Interrompre la lecture'),
+              style: FilledButton.styleFrom(backgroundColor: Colors.orange),
+              onPressed: () async {
+                await showEndReadingSessionSheet(context);
+                if (mounted) await _load();
+              },
+            ),
+          if (s != ReadingStatusValues.finished)
+            OutlinedButton.icon(
+              icon: const Icon(Icons.check, size: 18),
+              label: const Text('Marquer comme lu'),
+              onPressed: () => _markAsRead(context),
+            ),
+          if (s == ReadingStatusValues.finished)
+            OutlinedButton.icon(
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Remettre à lire'),
+              onPressed: () => _markAsToRead(context),
+            ),
+        ]),
+      ]);
+    });
+  }
+
+  Future<void> _startReading(BuildContext context) async {
+    await startOrResumeReadingSession(context, book!);
+    if (mounted) await _load();
+  }
+
+  Future<void> _markAsRead(BuildContext context) async {
+    final repo = context.read<ReadingRepository>();
+    final now = DateTime.now();
+    await repo.upsertProgress(ReadingProgressCompanion(
+      bookId: Value(widget.bookId),
+      status: const Value(ReadingStatusValues.finished),
+      readingFinishedAt: Value(now),
+    ));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Livre marqué comme lu')));
+      await _load();
+    }
+  }
+
+  Future<void> _markAsToRead(BuildContext context) async {
+    final repo = context.read<ReadingRepository>();
+    await repo.upsertProgress(ReadingProgressCompanion(
+      bookId: Value(widget.bookId),
+      status: const Value(ReadingStatusValues.toRead),
+    ));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Livre remis dans la liste « À lire »')));
+      await _load();
+    }
   }
 
   Widget _buildMetadataSearchSection(BuildContext context) {
