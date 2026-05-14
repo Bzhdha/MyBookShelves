@@ -33,6 +33,7 @@ import 'features/settings/data/app_lock_store.dart';
 import 'features/settings/ui/api_key_page.dart';
 import 'features/auth/ui/app_lock_screen.dart';
 import 'features/books/data/cover_scan_service.dart';
+import 'features/books/data/cover_search_service.dart';
 import 'features/shelves/data/shelves_repository.dart';
 import 'features/shelves/domain/shelf_service.dart';
 import 'features/shelves/ui/shelves_page.dart';
@@ -65,10 +66,18 @@ Future<void> main() async {
   await llmKeyStore.load();
   final scanSettingsStore = ScanSettingsStore();
   await scanSettingsStore.load();
+  final openLibraryProvider = OpenLibraryProvider(logger: appLogger);
+  final bdThequeProvider = BdThequeProvider();
+  final googleBooksProvider = GoogleBooksProvider(logger: appLogger);
+  final coverSearchService = CoverSearchService(
+    google: googleBooksProvider,
+    bdTheque: bdThequeProvider,
+    openLib: openLibraryProvider,
+  );
   final metadataService = MetadataService(
-    openLibrary: OpenLibraryProvider(logger: appLogger),
-    bdTheque: BdThequeProvider(),
-    googleBooks: GoogleBooksProvider(logger: appLogger),
+    openLibrary: openLibraryProvider,
+    bdTheque: bdThequeProvider,
+    googleBooks: googleBooksProvider,
     goodreads: GoodreadsProvider(logger: appLogger),
     amazon: AmazonProvider(logger: appLogger),
     llmProviders: [
@@ -96,6 +105,7 @@ Future<void> main() async {
         ChangeNotifierProvider<LlmKeyStore>.value(value: llmKeyStore),
         Provider<MetadataService>.value(value: metadataService),
         Provider<CoverCacheService>.value(value: coverCacheService),
+        Provider<CoverSearchService>.value(value: coverSearchService),
         Provider<BookService>.value(value: bookService),
         Provider<ShelfService>.value(value: shelfService),
         ChangeNotifierProvider<ScanSettingsStore>.value(value: scanSettingsStore),
