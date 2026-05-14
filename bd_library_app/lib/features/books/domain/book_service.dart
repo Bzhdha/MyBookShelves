@@ -121,15 +121,13 @@ class BookService {
     String? publishedDate,
     String? coverUrl,
     String? seriesName,
+    int? pageCount,
+    double? retailPrice,
   }) async {
-    _logger?.log('BookService.addBookManually', {
-      'isbn': isbn,
-      'title': title,
-      'authors': authors,
-    });
+    _logger?.log('BookService.addBookManually', {'isbn': isbn, 'title': title});
     final id = _uuid.v4();
     final seriesId = await _seriesIdForDisplayName(seriesName);
-
+    final now = DateTime.now();
     await _repo.upsertBook(
       BooksCompanion.insert(
         id: id,
@@ -137,14 +135,13 @@ class BookService {
         title: title,
         seriesId: Value(seriesId),
         authors: Value(authors),
-        publisher: Value(
-          publisher?.trim().isNotEmpty == true ? publisher!.trim() : null,
-        ),
-        publishedDate: Value(
-          publishedDate?.trim().isNotEmpty == true ? publishedDate!.trim() : null,
-        ),
+        publisher: Value(publisher?.trim().isNotEmpty == true ? publisher!.trim() : null),
+        publishedDate: Value(publishedDate?.trim().isNotEmpty == true ? publishedDate!.trim() : null),
         coverUrl: Value(coverUrl),
-        updatedAt: DateTime.now(),
+        pageCount: Value(pageCount),
+        retailPrice: Value(retailPrice),
+        registeredAt: Value(now),
+        updatedAt: now,
       ),
     );
     await _shelvesRepo.setBookShelves(id, []);
@@ -187,6 +184,7 @@ class BookService {
 
       final seriesId = await _seriesIdForDisplayName(meta?.seriesTitle);
 
+      final now = DateTime.now();
       await _repo.upsertBook(
         BooksCompanion.insert(
           id: newBookId,
@@ -200,7 +198,10 @@ class BookService {
           coverLocalPath: Value(coverLocalPath),
           volumeNumber: Value(volumeNumber),
           summary: Value(summaryText),
-          updatedAt: DateTime.now(),
+          pageCount: Value(meta?.pageCount),
+          retailPrice: Value(meta?.retailPrice),
+          registeredAt: Value(now),
+          updatedAt: now,
         ),
       );
 
@@ -268,20 +269,14 @@ class BookService {
               title: Value(newTitle),
               seriesId: Value(newSeriesId),
               authors: Value(newAuthors),
-              publisher: Value(
-                existing.publisher?.trim().isNotEmpty == true
-                    ? existing.publisher
-                    : meta.publisher,
-              ),
-              publishedDate: Value(
-                existing.publishedDate?.trim().isNotEmpty == true
-                    ? existing.publishedDate
-                    : meta.publishedDate,
-              ),
+              publisher: Value(existing.publisher?.trim().isNotEmpty == true ? existing.publisher : meta.publisher),
+              publishedDate: Value(existing.publishedDate?.trim().isNotEmpty == true ? existing.publishedDate : meta.publishedDate),
               coverUrl: Value(newCoverUrl),
               coverLocalPath: Value(newCoverLocalPath),
               volumeNumber: Value(newVolumeNumber),
               summary: Value(newSummary),
+              pageCount: Value(existing.pageCount ?? meta.pageCount),
+              retailPrice: Value(existing.retailPrice ?? meta.retailPrice),
               updatedAt: Value(DateTime.now()),
             ),
           );
@@ -321,6 +316,10 @@ class BookService {
     int? volumeNumber,
     String? summary,
     String? seriesNameOverride,
+    int? pageCount,
+    bool clearPageCount = false,
+    double? retailPrice,
+    bool clearRetailPrice = false,
   }) async {
     _logger?.log('BookService.updateBookDetails', {'id': id});
     final existing = await _repo.getBookById(id);
@@ -345,6 +344,9 @@ class BookService {
         coverLocalPath: Value(existing.coverLocalPath),
         tags: Value(existing.tags),
         summary: Value(summary ?? existing.summary),
+        pageCount: Value(clearPageCount ? null : (pageCount ?? existing.pageCount)),
+        retailPrice: Value(clearRetailPrice ? null : (retailPrice ?? existing.retailPrice)),
+        registeredAt: Value(existing.registeredAt),
         updatedAt: Value(DateTime.now()),
       ),
     );

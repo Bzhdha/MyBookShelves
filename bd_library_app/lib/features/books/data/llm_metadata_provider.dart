@@ -26,6 +26,8 @@ Fournis le résultat au format JSON strict avec les champs suivants (si disponib
 - "type" : "BD", "Manga", "Manhua", "Roman", etc.,
 - "tome" : le numéro du tome (si applicable),
 - "date_parution" : la date de parution (format AAAA-MM-JJ),
+- "nombre_pages" : le nombre de pages (entier),
+- "prix_public" : le prix public conseillé en euros (nombre décimal, ex: 13.99),
 - "résumé" : un résumé court du contenu,
 - "liens" : une liste d'URLs pour plus d'infos (si disponibles).
 
@@ -87,6 +89,14 @@ BdMetadata? parseLlmMetadataJsonFromFrench(Map<String, dynamic> meta) {
     }
   }
 
+  int? pageCount;
+  final nbPages = meta['nombre_pages'];
+  if (nbPages != null) pageCount = (nbPages as num?)?.toInt();
+
+  double? retailPrice;
+  final prixPublic = meta['prix_public'];
+  if (prixPublic != null) retailPrice = (prixPublic as num?)?.toDouble();
+
   return BdMetadata(
     title: title,
     authors: authors,
@@ -95,6 +105,8 @@ BdMetadata? parseLlmMetadataJsonFromFrench(Map<String, dynamic> meta) {
     description: description,
     volumeNumber: volumeNumber,
     seriesTitle: seriesTitle,
+    pageCount: pageCount,
+    retailPrice: retailPrice,
   );
 }
 
@@ -151,6 +163,14 @@ BdMetadata? parseLlmMetadataJson(Map<String, dynamic> meta) {
     }
   }
 
+  int? pageCount;
+  final pc = meta['pageCount'] ?? meta['page_count'] ?? meta['nombre_pages'];
+  if (pc != null) pageCount = (pc as num?)?.toInt();
+
+  double? retailPrice;
+  final rp = meta['retailPrice'] ?? meta['retail_price'] ?? meta['prix_public'];
+  if (rp != null) retailPrice = (rp as num?)?.toDouble();
+
   return BdMetadata(
     title: title,
     authors: authors,
@@ -159,5 +179,7 @@ BdMetadata? parseLlmMetadataJson(Map<String, dynamic> meta) {
     description: description,
     volumeNumber: volumeNumber,
     seriesTitle: seriesTitle,
+    pageCount: pageCount,
+    retailPrice: retailPrice,
   );
 }

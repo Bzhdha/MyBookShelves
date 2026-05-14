@@ -123,11 +123,11 @@ class ExportBook {
   final String? publishedDate;
 
   final String? coverUrl;
-  final String tags; // CSV
-
-  /// Résumé / synopsis de l'œuvre.
+  final String tags;
   final String summary;
-
+  final int? pageCount;
+  final double? retailPrice;
+  final DateTime? registeredAt;
   final DateTime updatedAt;
 
   ExportBook({
@@ -143,6 +143,9 @@ class ExportBook {
     this.publishedDate,
     this.coverUrl,
     this.summary = '',
+    this.pageCount,
+    this.retailPrice,
+    this.registeredAt,
   });
 
   Map<String, dynamic> toJson() => {
@@ -157,6 +160,9 @@ class ExportBook {
         'coverUrl': coverUrl,
         'tags': tags,
         'summary': summary,
+        'pageCount': pageCount,
+        'retailPrice': retailPrice,
+        'registeredAt': registeredAt?.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
       };
 
@@ -172,6 +178,9 @@ class ExportBook {
         coverUrl: json['coverUrl'] as String?,
         tags: (json['tags'] as String?) ?? '',
         summary: (json['summary'] as String?) ?? '',
+        pageCount: json['pageCount'] as int?,
+        retailPrice: (json['retailPrice'] as num?)?.toDouble(),
+        registeredAt: json['registeredAt'] != null ? DateTime.parse(json['registeredAt'] as String) : null,
         updatedAt: DateTime.parse(json['updatedAt'] as String),
       );
 }

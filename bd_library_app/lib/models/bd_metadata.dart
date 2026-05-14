@@ -6,9 +6,9 @@ class BdMetadata {
   final String? description;
   final String? coverUrl;
   final String? volumeNumber;
-
-  /// Série / collection regroupant plusieurs tomes (nom d’affichage).
   final String? seriesTitle;
+  final int? pageCount;
+  final double? retailPrice;
 
   BdMetadata({
     this.title,
@@ -19,5 +19,7 @@ class BdMetadata {
     this.coverUrl,
     this.volumeNumber,
     this.seriesTitle,
+    this.pageCount,
+    this.retailPrice,
   });
 }

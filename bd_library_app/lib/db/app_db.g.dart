@@ -505,6 +505,24 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _pageCountMeta = const VerificationMeta('pageCount');
+  @override
+  late final GeneratedColumn<int> pageCount = GeneratedColumn<int>(
+    'page_count', aliasedName, true,
+    type: DriftSqlType.int, requiredDuringInsert: false,
+  );
+  static const VerificationMeta _retailPriceMeta = const VerificationMeta('retailPrice');
+  @override
+  late final GeneratedColumn<double> retailPrice = GeneratedColumn<double>(
+    'retail_price', aliasedName, true,
+    type: DriftSqlType.double, requiredDuringInsert: false,
+  );
+  static const VerificationMeta _registeredAtMeta = const VerificationMeta('registeredAt');
+  @override
+  late final GeneratedColumn<DateTime> registeredAt = GeneratedColumn<DateTime>(
+    'registered_at', aliasedName, true,
+    type: DriftSqlType.dateTime, requiredDuringInsert: false,
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -530,6 +548,9 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     coverLocalPath,
     tags,
     summary,
+    pageCount,
+    retailPrice,
+    registeredAt,
     updatedAt,
   ];
   @override
@@ -626,6 +647,15 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         summary.isAcceptableOrUnknown(data['summary']!, _summaryMeta),
       );
     }
+    if (data.containsKey('page_count')) {
+      context.handle(_pageCountMeta, pageCount.isAcceptableOrUnknown(data['page_count']!, _pageCountMeta));
+    }
+    if (data.containsKey('retail_price')) {
+      context.handle(_retailPriceMeta, retailPrice.isAcceptableOrUnknown(data['retail_price']!, _retailPriceMeta));
+    }
+    if (data.containsKey('registered_at')) {
+      context.handle(_registeredAtMeta, registeredAt.isAcceptableOrUnknown(data['registered_at']!, _registeredAtMeta));
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -691,6 +721,9 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         DriftSqlType.string,
         data['${effectivePrefix}summary'],
       )!,
+      pageCount: attachedDatabase.typeMapping.read(DriftSqlType.int, data['${effectivePrefix}page_count']),
+      retailPrice: attachedDatabase.typeMapping.read(DriftSqlType.double, data['${effectivePrefix}retail_price']),
+      registeredAt: attachedDatabase.typeMapping.read(DriftSqlType.dateTime, data['${effectivePrefix}registered_at']),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -715,12 +748,11 @@ class Book extends DataClass implements Insertable<Book> {
   final String? publishedDate;
   final String? coverUrl;
   final String? coverLocalPath;
-
-  /// Tags perso (CSV) : "SF, Aventure, Humour"
   final String tags;
-
-  /// Résumé / synopsis (saisi à la main ou issu d'une recherche IA).
   final String summary;
+  final int? pageCount;
+  final double? retailPrice;
+  final DateTime? registeredAt;
   final DateTime updatedAt;
   const Book({
     required this.id,
@@ -735,6 +767,9 @@ class Book extends DataClass implements Insertable<Book> {
     this.coverLocalPath,
     required this.tags,
     required this.summary,
+    this.pageCount,
+    this.retailPrice,
+    this.registeredAt,
     required this.updatedAt,
   });
   @override
@@ -766,6 +801,15 @@ class Book extends DataClass implements Insertable<Book> {
     }
     map['tags'] = Variable<String>(tags);
     map['summary'] = Variable<String>(summary);
+    if (!nullToAbsent || pageCount != null) {
+      map['page_count'] = Variable<int>(pageCount);
+    }
+    if (!nullToAbsent || retailPrice != null) {
+      map['retail_price'] = Variable<double>(retailPrice);
+    }
+    if (!nullToAbsent || registeredAt != null) {
+      map['registered_at'] = Variable<DateTime>(registeredAt);
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -775,27 +819,18 @@ class Book extends DataClass implements Insertable<Book> {
       id: Value(id),
       isbn: isbn == null && nullToAbsent ? const Value.absent() : Value(isbn),
       title: Value(title),
-      seriesId: seriesId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(seriesId),
-      volumeNumber: volumeNumber == null && nullToAbsent
-          ? const Value.absent()
-          : Value(volumeNumber),
+      seriesId: seriesId == null && nullToAbsent ? const Value.absent() : Value(seriesId),
+      volumeNumber: volumeNumber == null && nullToAbsent ? const Value.absent() : Value(volumeNumber),
       authors: Value(authors),
-      publisher: publisher == null && nullToAbsent
-          ? const Value.absent()
-          : Value(publisher),
-      publishedDate: publishedDate == null && nullToAbsent
-          ? const Value.absent()
-          : Value(publishedDate),
-      coverUrl: coverUrl == null && nullToAbsent
-          ? const Value.absent()
-          : Value(coverUrl),
-      coverLocalPath: coverLocalPath == null && nullToAbsent
-          ? const Value.absent()
-          : Value(coverLocalPath),
+      publisher: publisher == null && nullToAbsent ? const Value.absent() : Value(publisher),
+      publishedDate: publishedDate == null && nullToAbsent ? const Value.absent() : Value(publishedDate),
+      coverUrl: coverUrl == null && nullToAbsent ? const Value.absent() : Value(coverUrl),
+      coverLocalPath: coverLocalPath == null && nullToAbsent ? const Value.absent() : Value(coverLocalPath),
       tags: Value(tags),
       summary: Value(summary),
+      pageCount: pageCount == null && nullToAbsent ? const Value.absent() : Value(pageCount),
+      retailPrice: retailPrice == null && nullToAbsent ? const Value.absent() : Value(retailPrice),
+      registeredAt: registeredAt == null && nullToAbsent ? const Value.absent() : Value(registeredAt),
       updatedAt: Value(updatedAt),
     );
   }
@@ -818,6 +853,9 @@ class Book extends DataClass implements Insertable<Book> {
       coverLocalPath: serializer.fromJson<String?>(json['coverLocalPath']),
       tags: serializer.fromJson<String>(json['tags']),
       summary: serializer.fromJson<String>(json['summary']),
+      pageCount: serializer.fromJson<int?>(json['pageCount']),
+      retailPrice: serializer.fromJson<double?>(json['retailPrice']),
+      registeredAt: serializer.fromJson<DateTime?>(json['registeredAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -837,6 +875,9 @@ class Book extends DataClass implements Insertable<Book> {
       'coverLocalPath': serializer.toJson<String?>(coverLocalPath),
       'tags': serializer.toJson<String>(tags),
       'summary': serializer.toJson<String>(summary),
+      'pageCount': serializer.toJson<int?>(pageCount),
+      'retailPrice': serializer.toJson<double?>(retailPrice),
+      'registeredAt': serializer.toJson<DateTime?>(registeredAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -854,6 +895,9 @@ class Book extends DataClass implements Insertable<Book> {
     Value<String?> coverLocalPath = const Value.absent(),
     String? tags,
     String? summary,
+    Value<int?> pageCount = const Value.absent(),
+    Value<double?> retailPrice = const Value.absent(),
+    Value<DateTime?> registeredAt = const Value.absent(),
     DateTime? updatedAt,
   }) => Book(
     id: id ?? this.id,
@@ -863,15 +907,14 @@ class Book extends DataClass implements Insertable<Book> {
     volumeNumber: volumeNumber.present ? volumeNumber.value : this.volumeNumber,
     authors: authors ?? this.authors,
     publisher: publisher.present ? publisher.value : this.publisher,
-    publishedDate: publishedDate.present
-        ? publishedDate.value
-        : this.publishedDate,
+    publishedDate: publishedDate.present ? publishedDate.value : this.publishedDate,
     coverUrl: coverUrl.present ? coverUrl.value : this.coverUrl,
-    coverLocalPath: coverLocalPath.present
-        ? coverLocalPath.value
-        : this.coverLocalPath,
+    coverLocalPath: coverLocalPath.present ? coverLocalPath.value : this.coverLocalPath,
     tags: tags ?? this.tags,
     summary: summary ?? this.summary,
+    pageCount: pageCount.present ? pageCount.value : this.pageCount,
+    retailPrice: retailPrice.present ? retailPrice.value : this.retailPrice,
+    registeredAt: registeredAt.present ? registeredAt.value : this.registeredAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   Book copyWithCompanion(BooksCompanion data) {
@@ -880,20 +923,17 @@ class Book extends DataClass implements Insertable<Book> {
       isbn: data.isbn.present ? data.isbn.value : this.isbn,
       title: data.title.present ? data.title.value : this.title,
       seriesId: data.seriesId.present ? data.seriesId.value : this.seriesId,
-      volumeNumber: data.volumeNumber.present
-          ? data.volumeNumber.value
-          : this.volumeNumber,
+      volumeNumber: data.volumeNumber.present ? data.volumeNumber.value : this.volumeNumber,
       authors: data.authors.present ? data.authors.value : this.authors,
       publisher: data.publisher.present ? data.publisher.value : this.publisher,
-      publishedDate: data.publishedDate.present
-          ? data.publishedDate.value
-          : this.publishedDate,
+      publishedDate: data.publishedDate.present ? data.publishedDate.value : this.publishedDate,
       coverUrl: data.coverUrl.present ? data.coverUrl.value : this.coverUrl,
-      coverLocalPath: data.coverLocalPath.present
-          ? data.coverLocalPath.value
-          : this.coverLocalPath,
+      coverLocalPath: data.coverLocalPath.present ? data.coverLocalPath.value : this.coverLocalPath,
       tags: data.tags.present ? data.tags.value : this.tags,
       summary: data.summary.present ? data.summary.value : this.summary,
+      pageCount: data.pageCount.present ? data.pageCount.value : this.pageCount,
+      retailPrice: data.retailPrice.present ? data.retailPrice.value : this.retailPrice,
+      registeredAt: data.registeredAt.present ? data.registeredAt.value : this.registeredAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -913,6 +953,9 @@ class Book extends DataClass implements Insertable<Book> {
           ..write('coverLocalPath: $coverLocalPath, ')
           ..write('tags: $tags, ')
           ..write('summary: $summary, ')
+          ..write('pageCount: $pageCount, ')
+          ..write('retailPrice: $retailPrice, ')
+          ..write('registeredAt: $registeredAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -920,19 +963,9 @@ class Book extends DataClass implements Insertable<Book> {
 
   @override
   int get hashCode => Object.hash(
-    id,
-    isbn,
-    title,
-    seriesId,
-    volumeNumber,
-    authors,
-    publisher,
-    publishedDate,
-    coverUrl,
-    coverLocalPath,
-    tags,
-    summary,
-    updatedAt,
+    id, isbn, title, seriesId, volumeNumber, authors, publisher,
+    publishedDate, coverUrl, coverLocalPath, tags, summary,
+    pageCount, retailPrice, registeredAt, updatedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -950,6 +983,9 @@ class Book extends DataClass implements Insertable<Book> {
           other.coverLocalPath == this.coverLocalPath &&
           other.tags == this.tags &&
           other.summary == this.summary &&
+          other.pageCount == this.pageCount &&
+          other.retailPrice == this.retailPrice &&
+          other.registeredAt == this.registeredAt &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -966,6 +1002,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
   final Value<String?> coverLocalPath;
   final Value<String> tags;
   final Value<String> summary;
+  final Value<int?> pageCount;
+  final Value<double?> retailPrice;
+  final Value<DateTime?> registeredAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const BooksCompanion({
@@ -981,6 +1020,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.coverLocalPath = const Value.absent(),
     this.tags = const Value.absent(),
     this.summary = const Value.absent(),
+    this.pageCount = const Value.absent(),
+    this.retailPrice = const Value.absent(),
+    this.registeredAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -997,6 +1039,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.coverLocalPath = const Value.absent(),
     this.tags = const Value.absent(),
     this.summary = const Value.absent(),
+    this.pageCount = const Value.absent(),
+    this.retailPrice = const Value.absent(),
+    this.registeredAt = const Value.absent(),
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -1015,6 +1060,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Expression<String>? coverLocalPath,
     Expression<String>? tags,
     Expression<String>? summary,
+    Expression<int>? pageCount,
+    Expression<double>? retailPrice,
+    Expression<DateTime>? registeredAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -1031,6 +1079,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
       if (coverLocalPath != null) 'cover_local_path': coverLocalPath,
       if (tags != null) 'tags': tags,
       if (summary != null) 'summary': summary,
+      if (pageCount != null) 'page_count': pageCount,
+      if (retailPrice != null) 'retail_price': retailPrice,
+      if (registeredAt != null) 'registered_at': registeredAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1049,6 +1100,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Value<String?>? coverLocalPath,
     Value<String>? tags,
     Value<String>? summary,
+    Value<int?>? pageCount,
+    Value<double?>? retailPrice,
+    Value<DateTime?>? registeredAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -1065,6 +1119,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
       coverLocalPath: coverLocalPath ?? this.coverLocalPath,
       tags: tags ?? this.tags,
       summary: summary ?? this.summary,
+      pageCount: pageCount ?? this.pageCount,
+      retailPrice: retailPrice ?? this.retailPrice,
+      registeredAt: registeredAt ?? this.registeredAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -1109,6 +1166,15 @@ class BooksCompanion extends UpdateCompanion<Book> {
     if (summary.present) {
       map['summary'] = Variable<String>(summary.value);
     }
+    if (pageCount.present) {
+      map['page_count'] = Variable<int>(pageCount.value);
+    }
+    if (retailPrice.present) {
+      map['retail_price'] = Variable<double>(retailPrice.value);
+    }
+    if (registeredAt.present) {
+      map['registered_at'] = Variable<DateTime>(registeredAt.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -1133,6 +1199,9 @@ class BooksCompanion extends UpdateCompanion<Book> {
           ..write('coverLocalPath: $coverLocalPath, ')
           ..write('tags: $tags, ')
           ..write('summary: $summary, ')
+          ..write('pageCount: $pageCount, ')
+          ..write('retailPrice: $retailPrice, ')
+          ..write('registeredAt: $registeredAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -5205,6 +5274,9 @@ typedef $$BooksTableCreateCompanionBuilder =
       Value<String?> coverLocalPath,
       Value<String> tags,
       Value<String> summary,
+      Value<int?> pageCount,
+      Value<double?> retailPrice,
+      Value<DateTime?> registeredAt,
       required DateTime updatedAt,
       Value<int> rowid,
     });
@@ -5222,6 +5294,9 @@ typedef $$BooksTableUpdateCompanionBuilder =
       Value<String?> coverLocalPath,
       Value<String> tags,
       Value<String> summary,
+      Value<int?> pageCount,
+      Value<double?> retailPrice,
+      Value<DateTime?> registeredAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -5346,6 +5421,21 @@ class $$BooksTableFilterComposer extends Composer<_$AppDb, $BooksTable> {
 
   ColumnFilters<String> get summary => $composableBuilder(
     column: $table.summary,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pageCount => $composableBuilder(
+    column: $table.pageCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get retailPrice => $composableBuilder(
+    column: $table.retailPrice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get registeredAt => $composableBuilder(
+    column: $table.registeredAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5491,6 +5581,21 @@ class $$BooksTableOrderingComposer extends Composer<_$AppDb, $BooksTable> {
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get pageCount => $composableBuilder(
+    column: $table.pageCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get retailPrice => $composableBuilder(
+    column: $table.retailPrice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get registeredAt => $composableBuilder(
+    column: $table.registeredAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -5566,6 +5671,15 @@ class $$BooksTableAnnotationComposer extends Composer<_$AppDb, $BooksTable> {
 
   GeneratedColumn<String> get summary =>
       $composableBuilder(column: $table.summary, builder: (column) => column);
+
+  GeneratedColumn<int> get pageCount =>
+      $composableBuilder(column: $table.pageCount, builder: (column) => column);
+
+  GeneratedColumn<double> get retailPrice =>
+      $composableBuilder(column: $table.retailPrice, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get registeredAt =>
+      $composableBuilder(column: $table.registeredAt, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -5688,6 +5802,9 @@ class $$BooksTableTableManager
                 Value<String?> coverLocalPath = const Value.absent(),
                 Value<String> tags = const Value.absent(),
                 Value<String> summary = const Value.absent(),
+                Value<int?> pageCount = const Value.absent(),
+                Value<double?> retailPrice = const Value.absent(),
+                Value<DateTime?> registeredAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BooksCompanion(
@@ -5703,6 +5820,9 @@ class $$BooksTableTableManager
                 coverLocalPath: coverLocalPath,
                 tags: tags,
                 summary: summary,
+                pageCount: pageCount,
+                retailPrice: retailPrice,
+                registeredAt: registeredAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -5720,6 +5840,9 @@ class $$BooksTableTableManager
                 Value<String?> coverLocalPath = const Value.absent(),
                 Value<String> tags = const Value.absent(),
                 Value<String> summary = const Value.absent(),
+                Value<int?> pageCount = const Value.absent(),
+                Value<double?> retailPrice = const Value.absent(),
+                Value<DateTime?> registeredAt = const Value.absent(),
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => BooksCompanion.insert(
@@ -5735,6 +5858,9 @@ class $$BooksTableTableManager
                 coverLocalPath: coverLocalPath,
                 tags: tags,
                 summary: summary,
+                pageCount: pageCount,
+                retailPrice: retailPrice,
+                registeredAt: registeredAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),

@@ -148,6 +148,9 @@ class LibraryTransferService {
                 coverUrl: b.coverUrl,
                 tags: b.tags,
                 summary: b.summary,
+                pageCount: b.pageCount,
+                retailPrice: b.retailPrice,
+                registeredAt: b.registeredAt,
                 updatedAt: b.updatedAt,
               ))
           .toList(),
@@ -454,6 +457,9 @@ class LibraryTransferService {
         coverLocalPath: Value(null),
         tags: Value(b.tags),
         summary: Value(b.summary),
+        pageCount: Value(b.pageCount),
+        retailPrice: Value(b.retailPrice),
+        registeredAt: Value(b.registeredAt),
         updatedAt: b.updatedAt,
       ));
     }
@@ -465,7 +471,6 @@ class LibraryTransferService {
       final local = await db.getBookById(localId);
       if (local == null) continue;
 
-      // Si import plus récent => overwrite, sinon on peut garder local
       if (imp.updatedAt.isAfter(local.updatedAt)) {
         await db.upsertBook(BooksCompanion(
           id: Value(localId),
@@ -479,6 +484,9 @@ class LibraryTransferService {
           coverUrl: Value(imp.coverUrl),
           tags: Value(imp.tags),
           summary: Value(imp.summary),
+          pageCount: Value(imp.pageCount),
+          retailPrice: Value(imp.retailPrice),
+          registeredAt: Value(imp.registeredAt),
           updatedAt: Value(imp.updatedAt),
         ));
       }
@@ -492,7 +500,6 @@ class LibraryTransferService {
 
       switch (c.choice) {
         case ConflictChoice.keepLocal:
-          // rien
           break;
 
         case ConflictChoice.keepImported:
@@ -508,6 +515,9 @@ class LibraryTransferService {
             coverUrl: Value(c.imported.coverUrl),
             tags: Value(c.imported.tags),
             summary: Value(c.imported.summary),
+            pageCount: Value(c.imported.pageCount),
+            retailPrice: Value(c.imported.retailPrice),
+            registeredAt: Value(c.imported.registeredAt),
             updatedAt: Value(c.imported.updatedAt),
           ));
           break;
@@ -526,7 +536,9 @@ class LibraryTransferService {
             coverUrl: Value(merged.coverUrl),
             tags: Value(merged.tags),
             summary: Value(merged.summary),
-            // on met "now" pour dire "résolu"
+            pageCount: Value(merged.pageCount),
+            retailPrice: Value(merged.retailPrice),
+            registeredAt: Value(merged.registeredAt),
             updatedAt: Value(DateTime.now()),
           ));
           break;
@@ -582,6 +594,9 @@ class LibraryTransferService {
         coverLocalPath: Value(null),
         tags: Value(b.tags),
         summary: Value(b.summary),
+        pageCount: Value(b.pageCount),
+        retailPrice: Value(b.retailPrice),
+        registeredAt: Value(b.registeredAt),
         updatedAt: b.updatedAt,
       ));
     }
@@ -606,6 +621,9 @@ class LibraryTransferService {
           coverUrl: Value(imp.coverUrl),
           tags: Value(imp.tags),
           summary: Value(imp.summary),
+          pageCount: Value(imp.pageCount),
+          retailPrice: Value(imp.retailPrice),
+          registeredAt: Value(imp.registeredAt),
           updatedAt: Value(imp.updatedAt),
         ));
       }
@@ -633,6 +651,9 @@ class LibraryTransferService {
             coverUrl: Value(c.imported.coverUrl),
             tags: Value(c.imported.tags),
             summary: Value(c.imported.summary),
+            pageCount: Value(c.imported.pageCount),
+            retailPrice: Value(c.imported.retailPrice),
+            registeredAt: Value(c.imported.registeredAt),
             updatedAt: Value(c.imported.updatedAt),
           ));
           break;
@@ -650,6 +671,9 @@ class LibraryTransferService {
             coverUrl: Value(merged.coverUrl),
             tags: Value(merged.tags),
             summary: Value(merged.summary),
+            pageCount: Value(merged.pageCount),
+            retailPrice: Value(merged.retailPrice),
+            registeredAt: Value(merged.registeredAt),
             updatedAt: Value(DateTime.now()),
           ));
           break;
@@ -880,6 +904,9 @@ class LibraryTransferService {
       coverUrl: pickN(local.coverUrl, imp.coverUrl),
       tags: mergedTags,
       summary: pick(local.summary, imp.summary),
+      pageCount: local.pageCount ?? imp.pageCount,
+      retailPrice: local.retailPrice ?? imp.retailPrice,
+      registeredAt: local.registeredAt ?? imp.registeredAt,
       updatedAt: DateTime.now(),
     );
   }

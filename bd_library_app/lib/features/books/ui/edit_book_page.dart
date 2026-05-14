@@ -27,6 +27,8 @@ class _EditBookPageState extends State<EditBookPage> {
   late final TextEditingController _seriesNameCtrl;
   late final TextEditingController _summaryCtrl;
   late final TextEditingController _promptCtrl;
+  late final TextEditingController _pageCountCtrl;
+  late final TextEditingController _retailPriceCtrl;
 
   final _speechSummary = SpeechDictation();
   bool _summaryListening = false;
@@ -49,6 +51,8 @@ class _EditBookPageState extends State<EditBookPage> {
     );
     _seriesNameCtrl = TextEditingController();
     _summaryCtrl = TextEditingController(text: b.summary);
+    _pageCountCtrl = TextEditingController(text: b.pageCount != null ? b.pageCount.toString() : '');
+    _retailPriceCtrl = TextEditingController(text: b.retailPrice != null ? b.retailPrice!.toStringAsFixed(2) : '');
     final defaultPrompt = llmIsbnSearchUserPromptTemplate.replaceAll(
       '[INSÉRER_ISBN_ICI]',
       b.isbn?.trim().isNotEmpty == true ? b.isbn!.trim() : '',
@@ -77,6 +81,8 @@ class _EditBookPageState extends State<EditBookPage> {
     _seriesNameCtrl.dispose();
     _summaryCtrl.dispose();
     _promptCtrl.dispose();
+    _pageCountCtrl.dispose();
+    _retailPriceCtrl.dispose();
     super.dispose();
   }
 
@@ -171,6 +177,12 @@ class _EditBookPageState extends State<EditBookPage> {
     if (meta.description != null && meta.description!.trim().isNotEmpty) {
       _summaryCtrl.text = meta.description!.trim();
     }
+    if (meta.pageCount != null) {
+      _pageCountCtrl.text = meta.pageCount.toString();
+    }
+    if (meta.retailPrice != null) {
+      _retailPriceCtrl.text = meta.retailPrice!.toStringAsFixed(2);
+    }
   }
 
   Future<void> _save() async {
@@ -186,6 +198,10 @@ class _EditBookPageState extends State<EditBookPage> {
     final bookService = context.read<BookService>();
     final volStr = _volumeNumberCtrl.text.trim();
     final volumeNumber = volStr.isEmpty ? null : int.tryParse(volStr);
+    final pcStr = _pageCountCtrl.text.trim();
+    final pageCount = pcStr.isEmpty ? null : int.tryParse(pcStr);
+    final rpStr = _retailPriceCtrl.text.trim();
+    final retailPrice = rpStr.isEmpty ? null : double.tryParse(rpStr.replaceAll(',', '.'));
 
     await bookService.updateBookDetails(
       widget.book.id,
@@ -197,6 +213,10 @@ class _EditBookPageState extends State<EditBookPage> {
       volumeNumber: volumeNumber,
       summary: _summaryCtrl.text.trim(),
       seriesNameOverride: _seriesNameCtrl.text.trim(),
+      pageCount: pageCount,
+      clearPageCount: pcStr.isEmpty,
+      retailPrice: retailPrice,
+      clearRetailPrice: rpStr.isEmpty,
     );
     if (!mounted) return;
     Navigator.pop(context, true);
@@ -272,6 +292,24 @@ class _EditBookPageState extends State<EditBookPage> {
               border: OutlineInputBorder(),
             ),
             keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _pageCountCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Nombre de pages',
+              border: OutlineInputBorder(),
+            ),
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _retailPriceCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Prix public conseillé (€)',
+              border: OutlineInputBorder(),
+            ),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),
           const SizedBox(height: 12),
           TextField(
