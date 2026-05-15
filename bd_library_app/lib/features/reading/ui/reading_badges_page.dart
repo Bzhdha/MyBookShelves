@@ -29,36 +29,45 @@ const _cats = [
 
 const _total = 11;
 
-class ReadingBadgesPage extends StatelessWidget {
+class ReadingBadgesPage extends StatefulWidget {
   const ReadingBadgesPage({super.key});
+  @override
+  State<ReadingBadgesPage> createState() => _ReadingBadgesPageState();
+}
 
+class _ReadingBadgesPageState extends State<ReadingBadgesPage> {
   static final _fmt = DateFormat.yMMMd('fr_FR');
+  late Future<List<EarnedBadgeRow>> _future;
 
   @override
-  Widget build(BuildContext context) {
-    final db = context.read<AppDb>();
-    return Scaffold(
-      appBar: AppBar(title: const Text('Badges de lecture')),
-      body: FutureBuilder<List<EarnedBadgeRow>>(
-        future: db.allEarnedBadgesOrdered(),
-        builder: (ctx, snap) {
-          if (snap.hasError) return Center(child: Text('Erreur: ${snap.error}', style: const TextStyle(color: kRed)));
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-          final earned = {for (final r in snap.data!) r.badgeId: r};
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-            children: [
-              _ProgressBanner(count: earned.length),
-              ..._cats.expand((cat) => [
-                _CatHeader(cat.$1),
-                ...cat.$2.map((b) => _BadgeRow(badgeId: b.$1, emoji: b.$2, row: earned[b.$1], fmt: _fmt)),
-              ]),
-            ],
-          );
-        },
-      ),
-    );
+  void initState() {
+    super.initState();
+    _future = context.read<AppDb>().allEarnedBadgesOrdered();
   }
+
+  @override
+  Widget build(BuildContext ctx) => Scaffold(
+    backgroundColor: kInk,
+    appBar: AppBar(title: const Text('Badges de lecture')),
+    body: FutureBuilder<List<EarnedBadgeRow>>(
+      future: _future,
+      builder: (ctx, snap) {
+        if (snap.hasError) return Center(child: Text('Erreur: ${snap.error}', style: const TextStyle(color: kRed)));
+        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        final earned = {for (final r in snap.data!) r.badgeId: r};
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+          children: [
+            _ProgressBanner(count: earned.length),
+            ..._cats.expand((cat) => [
+              _CatHeader(cat.$1),
+              ...cat.$2.map((b) => _BadgeRow(badgeId: b.$1, emoji: b.$2, row: earned[b.$1], fmt: _fmt)),
+            ]),
+          ],
+        );
+      },
+    ),
+  );
 }
 
 class _ProgressBanner extends StatelessWidget {
