@@ -37,20 +37,20 @@ class ReadingBadgesPage extends StatefulWidget {
 
 class _ReadingBadgesPageState extends State<ReadingBadgesPage> {
   static final _fmt = DateFormat.yMMMd('fr_FR');
-  late Future<List<EarnedBadgeRow>> _future;
+  late final Stream<List<EarnedBadgeRow>> _stream;
 
   @override
   void initState() {
     super.initState();
-    _future = context.read<AppDb>().allEarnedBadgesOrdered();
+    _stream = context.read<AppDb>().watchEarnedBadges();
   }
 
   @override
   Widget build(BuildContext ctx) => Scaffold(
     backgroundColor: kInk,
     appBar: AppBar(title: const Text('Badges de lecture')),
-    body: FutureBuilder<List<EarnedBadgeRow>>(
-      future: _future,
+    body: StreamBuilder<List<EarnedBadgeRow>>(
+      stream: _stream,
       builder: (ctx, snap) {
         if (snap.hasError) return Center(child: Text('Erreur: ${snap.error}', style: const TextStyle(color: kRed)));
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
