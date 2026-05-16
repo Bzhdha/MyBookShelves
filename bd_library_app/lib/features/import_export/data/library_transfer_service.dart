@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:archive/archive_io.dart';
 import 'package:drift/drift.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -264,12 +264,9 @@ class LibraryTransferService {
   /// PICK ZIP
   /// ----------------------------
   Future<File?> pickZipFile() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['zip'],
-    );
-    if (result == null || result.files.single.path == null) return null;
-    return File(result.files.single.path!);
+    final file = await openFile(acceptedTypeGroups: [XTypeGroup(label: 'zip', extensions: ['zip'])]);
+    if (file == null) return null;
+    return File(file.path);
   }
 
   /// Charge une bibliothèque depuis un fichier JSON ou ZIP (sans l'importer en BDD).
@@ -283,24 +280,18 @@ class LibraryTransferService {
 
   /// Choisir un fichier bibliothèque (JSON ou ZIP).
   Future<File?> pickLibraryFile() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['json', 'zip'],
-    );
-    if (result == null || result.files.single.path == null) return null;
-    return File(result.files.single.path!);
+    final file = await openFile(acceptedTypeGroups: [XTypeGroup(label: 'bibliothèque', extensions: ['json', 'zip'])]);
+    if (file == null) return null;
+    return File(file.path);
   }
 
   /// ----------------------------
   /// PICK JSON
   /// ----------------------------
   Future<File?> pickJsonFile() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-    );
-    if (result == null || result.files.single.path == null) return null;
-    return File(result.files.single.path!);
+    final file = await openFile(acceptedTypeGroups: [XTypeGroup(label: 'json', extensions: ['json'])]);
+    if (file == null) return null;
+    return File(file.path);
   }
 
   /// ----------------------------
