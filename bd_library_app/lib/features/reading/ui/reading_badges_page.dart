@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../db/app_db.dart';
+import '../data/badges_prefs.dart';
 import '../domain/reading_badge_catalog.dart';
 
 const _cats = [
@@ -69,9 +70,37 @@ class _ReadingBadgesPageState extends State<ReadingBadgesPage> {
   }
 
   @override
-  Widget build(BuildContext ctx) => Scaffold(
-    backgroundColor: kInk,
-    appBar: AppBar(title: const Text('Badges de lecture')),
+  Widget build(BuildContext ctx) {
+    final prefs=ctx.watch<BadgesPrefs>();
+    return Scaffold(
+    backgroundColor: prefs.bg,
+    appBar: AppBar(
+      title: const Text('Badges de lecture'),
+      actions: [
+        PopupMenuButton<Color>(
+          icon: const Icon(Icons.palette_outlined),
+          tooltip: 'Couleur de fond',
+          itemBuilder: (_) => BadgesPrefs.options.map((o) {
+            final (c, label) = o;
+            return PopupMenuItem(
+              value: c,
+              child: Row(children: [
+                Container(
+                  width: 20, height: 20,
+                  decoration: BoxDecoration(
+                    color: c,
+                    border: Border.all(color: c==prefs.bg ? kYellow : kBorder, width: c==prefs.bg ? 2 : 1),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(label, style: tMono(11, c: kPaper)),
+              ]),
+            );
+          }).toList(),
+          onSelected: (c) => ctx.read<BadgesPrefs>().setBg(c),
+        ),
+      ],
+    ),
     body: StreamBuilder<List<EarnedBadgeRow>>(
       stream: _stream,
       builder: (ctx, snap) {

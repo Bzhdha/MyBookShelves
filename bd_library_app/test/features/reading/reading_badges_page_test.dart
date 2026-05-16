@@ -7,6 +7,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'package:bd_library_app/db/app_db.dart';
+import 'package:bd_library_app/features/reading/data/badges_prefs.dart';
 import 'package:bd_library_app/features/reading/domain/reading_badge_catalog.dart';
 import 'package:bd_library_app/features/reading/ui/reading_badges_page.dart';
 
@@ -22,7 +23,13 @@ void main() {
   tearDown(() => db.close());
 
   Widget wrap() => MaterialApp(
-    home: Provider<AppDb>.value(value: db, child: const ReadingBadgesPage()),
+    home: MultiProvider(
+      providers: [
+        Provider<AppDb>.value(value: db),
+        ChangeNotifierProvider(create: (_) => BadgesPrefs()),
+      ],
+      child: const ReadingBadgesPage(),
+    ),
   );
 
   group('ReadingBadgesPage — états visuels', () {
@@ -61,6 +68,21 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byIcon(Icons.emoji_events), findsOneWidget);
       expect(find.byIcon(Icons.check_circle), findsOneWidget);
+    });
+
+    testWidgets('bouton palette change la couleur de fond', (t) async {
+      await t.pumpWidget(wrap());
+      await t.pumpAndSettle();
+      final before=t.widget<Scaffold>(find.byType(Scaffold).first);
+      expect(before.backgroundColor, BadgesPrefs.options[0].$1);
+
+      await t.tap(find.byIcon(Icons.palette_outlined));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Marine'));
+      await t.pumpAndSettle();
+
+      final after=t.widget<Scaffold>(find.byType(Scaffold).first);
+      expect(after.backgroundColor, BadgesPrefs.options[2].$1);
     });
 
     testWidgets('badge gagné supprime le label PROCHAIN OBJECTIF de sa catégorie', (t) async {
