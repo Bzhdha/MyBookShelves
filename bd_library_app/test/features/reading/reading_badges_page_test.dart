@@ -28,7 +28,7 @@ void main() {
   group('ReadingBadgesPage — états visuels', () {
     testWidgets('affiche les 11 titres de badges sans badge gagné', (t) async {
       await t.pumpWidget(wrap());
-      await t.pump();
+      await t.pumpAndSettle();
       for (final id in [
         ReadingBadgeIds.firstBookEver, ReadingBadgeIds.books10, ReadingBadgeIds.books25,
         ReadingBadgeIds.books50, ReadingBadgeIds.books100,
@@ -42,13 +42,13 @@ void main() {
 
     testWidgets('affiche exactement 3 labels PROCHAIN OBJECTIF (un par catégorie)', (t) async {
       await t.pumpWidget(wrap());
-      await t.pump();
+      await t.pumpAndSettle();
       expect(find.text('PROCHAIN OBJECTIF'), findsNWidgets(3));
     });
 
     testWidgets('badge verrouillé affiche lock_outline', (t) async {
       await t.pumpWidget(wrap());
-      await t.pump();
+      await t.pumpAndSettle();
       // 8 badges verrouillés (11 total − 3 premiers de chaque catégorie = next)
       expect(find.byIcon(Icons.lock_outline), findsNWidgets(8));
     });
@@ -58,7 +58,7 @@ void main() {
         id: 'uuid-1', badgeId: ReadingBadgeIds.firstBookEver, unlockedAt: DateTime(2026, 1, 15),
       ));
       await t.pumpWidget(wrap());
-      await t.pump();
+      await t.pumpAndSettle();
       expect(find.byIcon(Icons.emoji_events), findsOneWidget);
       expect(find.byIcon(Icons.check_circle), findsOneWidget);
     });
@@ -68,7 +68,7 @@ void main() {
         id: 'uuid-1', badgeId: ReadingBadgeIds.firstBookEver, unlockedAt: DateTime(2026, 1, 15),
       ));
       await t.pumpWidget(wrap());
-      await t.pump();
+      await t.pumpAndSettle();
       // firstBookEver gagné → books10 devient PROCHAIN OBJECTIF dans sa catégorie
       // les 2 autres catégories conservent leur propre PROCHAIN OBJECTIF
       expect(find.text('PROCHAIN OBJECTIF'), findsNWidgets(3));
