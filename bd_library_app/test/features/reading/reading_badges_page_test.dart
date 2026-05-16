@@ -32,6 +32,14 @@ void main() {
     ),
   );
 
+  group('ReadingBadgesPage — initialData (fix page grise)', () {
+    testWidgets('affiche les badges dès le premier frame sans attendre le stream', (t) async {
+      await t.pumpWidget(wrap());
+      await t.pump(); // un seul frame, pas pumpAndSettle
+      expect(find.text(readingBadgeMeta(ReadingBadgeIds.firstBookEver)!.title), findsOneWidget);
+    });
+  });
+
   group('ReadingBadgesPage — états visuels', () {
     testWidgets('affiche les 11 titres de badges sans badge gagné', (t) async {
       await t.pumpWidget(wrap());

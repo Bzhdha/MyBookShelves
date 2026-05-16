@@ -37,9 +37,9 @@ typedef _BStyle = ({Color border, double bw, double emojiOp, Color titleC, Color
 
 _BStyle _bstyle(_BS s) => switch (s) {
   _BS.earned => (
-    border: kYellow, bw: 2.0, emojiOp: 1.0,
-    titleC: kYellow, descC: kPaper,
-    bgLeft: kYellow.withValues(alpha: .15),
+    border: kPaper, bw: 2.0, emojiOp: 1.0,
+    titleC: kPaper, descC: kPaper,
+    bgLeft: kPaper.withValues(alpha: .12),
   ),
   _BS.next => (
     border: kYellow.withValues(alpha: .5), bw: 1.5, emojiOp: .7,
@@ -103,10 +103,10 @@ class _ReadingBadgesPageState extends State<ReadingBadgesPage> {
     ),
     body: StreamBuilder<List<EarnedBadgeRow>>(
       stream: _stream,
+      initialData: const [],
       builder: (ctx, snap) {
         if (snap.hasError) return Center(child: Text('Erreur: ${snap.error}', style: const TextStyle(color: kRed)));
-        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-        final earned = {for (final r in snap.data!) r.badgeId: r};
+        final earned = {for (final r in snap.data ?? <EarnedBadgeRow>[]) r.badgeId: r};
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
           children: [
