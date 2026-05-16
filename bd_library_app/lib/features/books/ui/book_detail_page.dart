@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -518,11 +518,10 @@ class _BookDetailPageState extends State<BookDetailPage> {
   }
 
   Future<void> _pickImageForCoverOcr(BuildContext context) async {
-    final r = await FilePicker.pickFiles(type: FileType.image);
+    final file = await openFile(acceptedTypeGroups: [XTypeGroup(label: 'images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'])]);
     if (!mounted) return;
-    final path = r?.files.single.path;
-    if (path == null) return;
-    await _openCoverOcr(context, path);
+    if (file == null) return;
+    await _openCoverOcr(context, file.path);
   }
 
   Future<void> _replaceCoverOrBack(BuildContext context, {required bool isCover}) async {

@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:archive/archive_io.dart';
 import 'package:drift/drift.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -78,12 +78,9 @@ class FamilyTransferService {
   }
 
   Future<File?> pickZip() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['zip'],
-    );
-    if (result == null || result.files.single.path == null) return null;
-    return File(result.files.single.path!);
+    final file = await openFile(acceptedTypeGroups: [XTypeGroup(label: 'zip', extensions: ['zip'])]);
+    if (file == null) return null;
+    return File(file.path);
   }
 
   /// Import family.zip :
