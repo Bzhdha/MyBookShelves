@@ -59,6 +59,9 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Run tests
+        run: flutter test
+
       - name: Setup signing
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
