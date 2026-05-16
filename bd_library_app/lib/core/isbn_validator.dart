@@ -16,16 +16,15 @@ class IsbnValidator {
   }
 
   static String? _validateIsbn10(String isbn) {
-    final upper = isbn.toUpperCase();
     int sum = 0;
     for (int i = 0; i < 9; i++) {
-      final c = upper[i];
+      final c = isbn[i];
       if (c.compareTo('0') < 0 || c.compareTo('9') > 0) {
         return 'Caractère invalide à la position $i : $c';
       }
       sum += int.parse(c) * (10 - i);
     }
-    final last = upper[9];
+    final last = isbn[9];
     if (last == 'X') {
       sum += 10;
     } else if (last.compareTo('0') >= 0 && last.compareTo('9') <= 0) {
