@@ -128,6 +128,7 @@ class _ReadingBadgesPageState extends State<ReadingBadgesPage> {
     ),
   );
 }
+}
 
 class _ProgressBanner extends StatelessWidget {
   const _ProgressBanner({required this.count});
