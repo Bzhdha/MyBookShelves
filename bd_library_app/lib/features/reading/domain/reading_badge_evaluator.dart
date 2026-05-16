@@ -41,6 +41,7 @@ class ReadingBadgeEvaluator {
         ReadingBadgeIds.pioneerWeek,
         _weekPeriodKey(local),
         context: {'bookId': bookId},
+        unlockedAt: local,
       );
     }
 
@@ -54,6 +55,7 @@ class ReadingBadgeEvaluator {
         ReadingBadgeIds.pioneerMonth,
         _monthPeriodKey(local),
         context: {'bookId': bookId},
+        unlockedAt: local,
       );
     }
 
@@ -66,19 +68,20 @@ class ReadingBadgeEvaluator {
         ReadingBadgeIds.pioneerYear,
         _yearPeriodKey(local),
         context: {'bookId': bookId},
+        unlockedAt: local,
       );
     }
 
-    await _grantVolumeMilestones(unlocked);
-    await _grantSeriesMilestones(unlocked);
+    await _grantVolumeMilestones(unlocked, local);
+    await _grantSeriesMilestones(unlocked, local);
     return unlocked;
   }
 
   /// Rattrapage : paliers de tomes / séries (ex. après import JSON ou ZIP).
   Future<void> syncMilestoneBadgesFromProgress() async {
     final unlocked = <ReadingBadgeUnlock>[];
-    await _grantVolumeMilestones(unlocked);
-    await _grantSeriesMilestones(unlocked);
+    await _grantVolumeMilestones(unlocked, null);
+    await _grantSeriesMilestones(unlocked, null);
   }
 
   Future<void> _tryGrant(
@@ -86,12 +89,13 @@ class ReadingBadgeEvaluator {
     String badgeId,
     String periodKey, {
     Map<String, dynamic>? context,
+    DateTime? unlockedAt,
   }) async {
     final inserted = await _db.insertEarnedBadgeIfAbsent(
       EarnedBadgesCompanion.insert(
         id: _uuid.v4(),
         badgeId: badgeId,
-        unlockedAt: DateTime.now(),
+        unlockedAt: unlockedAt ?? DateTime.now(),
         periodKey:
             periodKey.isEmpty ? const Value.absent() : Value(periodKey),
         contextJson: Value(context == null ? null : jsonEncode(context)),
@@ -152,23 +156,13 @@ class ReadingBadgeEvaluator {
     return rows.length;
   }
 
-  Future<void> _grantVolumeMilestones(List<ReadingBadgeUnlock> unlocked) async {
+  Future<void> _grantVolumeMilestones(List<ReadingBadgeUnlock> unlocked, DateTime? unlockedAt) async {
     final n = await _countFinishedBooks();
-    if (n >= 1) {
-      await _tryGrant(unlocked, ReadingBadgeIds.firstBookEver, '');
-    }
-    if (n >= 10) {
-      await _tryGrant(unlocked, ReadingBadgeIds.books10, '');
-    }
-    if (n >= 25) {
-      await _tryGrant(unlocked, ReadingBadgeIds.books25, '');
-    }
-    if (n >= 50) {
-      await _tryGrant(unlocked, ReadingBadgeIds.books50, '');
-    }
-    if (n >= 100) {
-      await _tryGrant(unlocked, ReadingBadgeIds.books100, '');
-    }
+    if (n >= 1) await _tryGrant(unlocked, ReadingBadgeIds.firstBookEver, '', unlockedAt: unlockedAt);
+    if (n >= 10) await _tryGrant(unlocked, ReadingBadgeIds.books10, '', unlockedAt: unlockedAt);
+    if (n >= 25) await _tryGrant(unlocked, ReadingBadgeIds.books25, '', unlockedAt: unlockedAt);
+    if (n >= 50) await _tryGrant(unlocked, ReadingBadgeIds.books50, '', unlockedAt: unlockedAt);
+    if (n >= 100) await _tryGrant(unlocked, ReadingBadgeIds.books100, '', unlockedAt: unlockedAt);
   }
 
   /// Séries avec [expectedVolumes] : tomes 1…N tous en bibliothèque et tous terminés.
@@ -205,16 +199,10 @@ class ReadingBadgeEvaluator {
     return n;
   }
 
-  Future<void> _grantSeriesMilestones(List<ReadingBadgeUnlock> unlocked) async {
+  Future<void> _grantSeriesMilestones(List<ReadingBadgeUnlock> unlocked, DateTime? unlockedAt) async {
     final c = await _countCompleteSeriesModeA();
-    if (c >= 1) {
-      await _tryGrant(unlocked, ReadingBadgeIds.firstSeriesComplete, '');
-    }
-    if (c >= 5) {
-      await _tryGrant(unlocked, ReadingBadgeIds.seriesCollector5, '');
-    }
-    if (c >= 10) {
-      await _tryGrant(unlocked, ReadingBadgeIds.seriesCollector10, '');
-    }
+    if (c >= 1) await _tryGrant(unlocked, ReadingBadgeIds.firstSeriesComplete, '', unlockedAt: unlockedAt);
+    if (c >= 5) await _tryGrant(unlocked, ReadingBadgeIds.seriesCollector5, '', unlockedAt: unlockedAt);
+    if (c >= 10) await _tryGrant(unlocked, ReadingBadgeIds.seriesCollector10, '', unlockedAt: unlockedAt);
   }
 }
