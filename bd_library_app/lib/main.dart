@@ -28,6 +28,7 @@ import 'features/shelves/data/shelves_repository.dart';
 import 'features/shelves/domain/shelf_service.dart';
 import 'core/app_logger.dart';
 import 'features/reading/data/reading_repository.dart';
+import 'features/reading/data/badges_prefs.dart';
 import 'features/reading/domain/reading_badge_evaluator.dart';
 import 'features/reading/domain/reading_session_store.dart';
 import 'features/home/new_home_page.dart';
@@ -76,6 +77,8 @@ Future<void> main() async {
     appLogger,
   );
   final readingRepository = ReadingRepository(db);
+  final badgesPrefs = BadgesPrefs();
+  await badgesPrefs.load();
 
   runApp(
     MultiProvider(
@@ -94,6 +97,7 @@ Future<void> main() async {
         ChangeNotifierProvider<AppLogger>.value(value: appLogger),
         ChangeNotifierProvider<AppLockStore>.value(value: appLockStore),
         Provider<ReadingRepository>.value(value: readingRepository),
+        ChangeNotifierProvider<BadgesPrefs>.value(value: badgesPrefs),
         ChangeNotifierProvider<ReadingSessionStore>(
           create: (context) => ReadingSessionStore(
             context.read<ReadingRepository>(),
