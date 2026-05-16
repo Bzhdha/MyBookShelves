@@ -187,6 +187,7 @@ class EarnedBadges extends Table {
 ])
 class AppDb extends _$AppDb {
   AppDb() : super(_openConnection());
+  AppDb.forTesting(QueryExecutor e) : super(e);
 
   @override
   int get schemaVersion => 9;
