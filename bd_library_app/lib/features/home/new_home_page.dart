@@ -17,6 +17,7 @@ import '../reading/ui/reading_stats_page.dart';
 import '../reading/ui/reading_badges_page.dart';
 import 'book_carousel.dart';
 import 'series_alerts_section.dart';
+import 'series_page.dart';
 import 'marketplace_search.dart';
 import '../../core/speech_dictation.dart';
 import '../import_export/data/library_transfer_service.dart';
@@ -193,6 +194,7 @@ return Container(
 decoration:const BoxDecoration(color:kPaper,border:Border(top:BorderSide(color:kInk,width:4))),
 child:SafeArea(top:false,child:Row(children:[
 _navItem(Icons.menu_book,'Biblio',true,(){}),
+_navItem(Icons.collections_bookmark,'Séries',false,()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>const SeriesPage()))),
 _navItem(Icons.book,'Lecture',false,()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingStatusPage()))),
 _navItem(Icons.bar_chart,'Stats',false,()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingStatsPage()))),
 _navItem(Icons.emoji_events,'Badges',false,()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingBadgesPage()))),
@@ -241,6 +243,7 @@ _dExp(Icons.download,'Exporter',[
 _dSub(Icons.archive,'ZIP complet',()async{Navigator.pop(c);final db=c.read<AppDb>();final t=LibraryTransferService(db);try{await t.shareExportZip();}catch(e){if(c.mounted)ScaffoldMessenger.of(c).showSnackBar(SnackBar(content:Text('Erreur: $e')));}}),
 _dSub(Icons.description,'JSON',()async{Navigator.pop(c);final db=c.read<AppDb>();final t=LibraryTransferService(db);try{await t.shareExportJson();}catch(e){if(c.mounted)ScaffoldMessenger.of(c).showSnackBar(SnackBar(content:Text('Erreur: $e')));}})]),
 _dItem(Icons.people_outline,'Bibliothèques importées',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ImportedLibrariesListPage()));}),
+_dItem(Icons.collections_bookmark,'Séries',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const SeriesPage()));}),
 _dItem(Icons.group,'Membres',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const UsersPage()));}),
 _dItem(Icons.add,'Ajouter un livre',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const AddBookPage()));}),
 _dItem(Icons.menu_book,'Étagères',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ShelvesPage()));}),
