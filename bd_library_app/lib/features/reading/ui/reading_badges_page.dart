@@ -29,6 +29,29 @@ const _cats = [
 
 const _total = 11;
 
+// ── États visuels centralisés ────────────────────────────────────────────────
+enum _BS { earned, next, locked }
+
+typedef _BStyle = ({Color border, double bw, double emojiOp, Color titleC, Color descC, Color bgLeft});
+
+_BStyle _bstyle(_BS s) => switch (s) {
+  _BS.earned => (
+    border: kYellow, bw: 2.0, emojiOp: 1.0,
+    titleC: kYellow, descC: kPaper,
+    bgLeft: kYellow.withValues(alpha: .15),
+  ),
+  _BS.next => (
+    border: kYellow.withValues(alpha: .5), bw: 1.5, emojiOp: .7,
+    titleC: kPaper.withValues(alpha: .8), descC: kPaper.withValues(alpha: .65),
+    bgLeft: kYellow.withValues(alpha: .06),
+  ),
+  _BS.locked => (
+    border: kBorder, bw: 1.0, emojiOp: .35,
+    titleC: kMuted, descC: kMuted.withValues(alpha: .75),
+    bgLeft: Colors.transparent,
+  ),
+};
+
 class ReadingBadgesPage extends StatefulWidget {
   const ReadingBadgesPage({super.key});
   @override
@@ -152,47 +175,35 @@ class _BadgeRow extends StatelessWidget {
   Widget build(BuildContext ctx) {
     final meta = readingBadgeMeta(badgeId);
     final ok = row != null;
-    final borderColor = ok ? kYellow : isNext ? kYellow.withValues(alpha: 0.38) : kBorder;
-    final borderWidth = ok ? 2.0 : isNext ? 1.5 : 1.0;
+    final bs = ok ? _BS.earned : isNext ? _BS.next : _BS.locked;
+    final st = _bstyle(bs);
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
         color: kPanelBg,
-        border: Border.all(color: borderColor, width: borderWidth),
+        border: Border.all(color: st.border, width: st.bw),
       ),
       child: Row(children: [
         Container(
-          width: 70,
-          height: 70,
+          width: 70, height: 70,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: ok ? kYellow.withValues(alpha: 0.12) : isNext ? kYellow.withValues(alpha: 0.05) : Colors.transparent,
-            border: Border(right: BorderSide(color: borderColor, width: borderWidth)),
+            color: st.bgLeft,
+            border: Border(right: BorderSide(color: st.border, width: st.bw)),
           ),
-          child: Opacity(
-            opacity: ok ? 1.0 : isNext ? 0.55 : 0.25,
-            child: Text(emoji, style: const TextStyle(fontSize: 34)),
-          ),
+          child: Opacity(opacity: st.emojiOp, child: Text(emoji, style: const TextStyle(fontSize: 34))),
         ),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              if (isNext) ...[
-                Text('PROCHAIN OBJECTIF', style: tMono(8, c: kYellow.withValues(alpha: 0.7), ls: 1.5)),
+              if (bs == _BS.next) ...[
+                Text('PROCHAIN OBJECTIF', style: tMono(8, c: kYellow.withValues(alpha: .7), ls: 1.5)),
                 const SizedBox(height: 3),
               ],
-              Text(
-                meta?.title ?? badgeId,
-                style: tBebas(15, c: ok ? kYellow : isNext ? kPaper.withValues(alpha: 0.6) : kMuted, ls: 1),
-              ),
+              Text(meta?.title ?? badgeId, style: tBebas(15, c: st.titleC, ls: 1)),
               const SizedBox(height: 3),
-              Text(
-                meta?.description ?? '',
-                style: tSerif(12, c: ok ? kPaper : kMuted),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+              Text(meta?.description ?? '', style: tSerif(12, c: st.descC), maxLines: 2, overflow: TextOverflow.ellipsis),
               if (ok) ...[
                 const SizedBox(height: 5),
                 Row(children: [
@@ -206,11 +217,11 @@ class _BadgeRow extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.only(right: 12),
-          child: ok
-              ? const Icon(Icons.emoji_events, color: kYellow, size: 22)
-              : isNext
-                  ? Icon(Icons.radio_button_unchecked, color: kYellow.withValues(alpha: 0.5), size: 20)
-                  : const Icon(Icons.radio_button_unchecked, color: kMuted, size: 20),
+          child: switch (bs) {
+            _BS.earned => const Icon(Icons.emoji_events, color: kYellow, size: 22),
+            _BS.next   => Icon(Icons.radio_button_unchecked, color: kYellow.withValues(alpha: .5), size: 20),
+            _BS.locked => const Icon(Icons.lock_outline, color: kMuted, size: 18),
+          },
         ),
       ]),
     );
