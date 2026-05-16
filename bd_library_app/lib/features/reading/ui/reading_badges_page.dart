@@ -59,10 +59,17 @@ class _ReadingBadgesPageState extends State<ReadingBadgesPage> {
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
           children: [
             _ProgressBanner(count: earned.length),
-            ..._cats.expand((cat) => [
-              _CatHeader(cat.$1),
-              ...cat.$2.map((b) => _BadgeRow(badgeId: b.$1, emoji: b.$2, row: earned[b.$1], fmt: _fmt)),
-            ]),
+            ..._cats.expand<Widget>((cat) {
+              var nextFound = false;
+              final widgets = <Widget>[_CatHeader(cat.$1)];
+              for (final b in cat.$2) {
+                final row = earned[b.$1];
+                final isNext = !nextFound && row == null;
+                if (isNext) nextFound = true;
+                widgets.add(_BadgeRow(badgeId: b.$1, emoji: b.$2, row: row, fmt: _fmt, isNext: isNext));
+              }
+              return widgets;
+            }),
           ],
         );
       },
@@ -112,10 +119,10 @@ class _ProgressBanner extends StatelessWidget {
         const SizedBox(height: 10),
         Text(
           count == 0
-              ? 'Termine ta première lecture pour débloquer ton premier badge !'
+              ? 'Lance ta première lecture pour décrocher ton premier badge !'
               : done
                   ? 'Bravo ! Tu as débloqué tous les badges. Tu es un(e) maître des BD !'
-                  : '${_total - count} badge${_total - count > 1 ? 's' : ''} encore à débloquer — continue à lire !',
+                  : '$count badge${count > 1 ? 's' : ''} décroché${count > 1 ? 's' : ''} — ${count < 4 ? 'beau départ' : 'belle progression'}, continue !',
           style: tSerif(12, italic: true, c: count == 0 ? kMuted : kPaper),
         ),
       ]),
@@ -135,20 +142,23 @@ class _CatHeader extends StatelessWidget {
 }
 
 class _BadgeRow extends StatelessWidget {
-  const _BadgeRow({required this.badgeId, required this.emoji, required this.row, required this.fmt});
+  const _BadgeRow({required this.badgeId, required this.emoji, required this.row, required this.fmt, this.isNext = false});
   final String badgeId, emoji;
   final EarnedBadgeRow? row;
   final DateFormat fmt;
+  final bool isNext;
 
   @override
   Widget build(BuildContext ctx) {
     final meta = readingBadgeMeta(badgeId);
     final ok = row != null;
+    final borderColor = ok ? kYellow : isNext ? kYellow.withValues(alpha: 0.38) : kBorder;
+    final borderWidth = ok ? 2.0 : isNext ? 1.5 : 1.0;
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
         color: kPanelBg,
-        border: Border.all(color: ok ? kYellow : kBorder, width: ok ? 2 : 1),
+        border: Border.all(color: borderColor, width: borderWidth),
       ),
       child: Row(children: [
         Container(
@@ -156,11 +166,11 @@ class _BadgeRow extends StatelessWidget {
           height: 70,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: ok ? kYellow.withValues(alpha: 0.12) : Colors.transparent,
-            border: Border(right: BorderSide(color: ok ? kYellow : kBorder, width: ok ? 2 : 1)),
+            color: ok ? kYellow.withValues(alpha: 0.12) : isNext ? kYellow.withValues(alpha: 0.05) : Colors.transparent,
+            border: Border(right: BorderSide(color: borderColor, width: borderWidth)),
           ),
           child: Opacity(
-            opacity: ok ? 1.0 : 0.25,
+            opacity: ok ? 1.0 : isNext ? 0.55 : 0.25,
             child: Text(emoji, style: const TextStyle(fontSize: 34)),
           ),
         ),
@@ -168,9 +178,13 @@ class _BadgeRow extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (isNext) ...[
+                Text('PROCHAIN OBJECTIF', style: tMono(8, c: kYellow.withValues(alpha: 0.7), ls: 1.5)),
+                const SizedBox(height: 3),
+              ],
               Text(
                 meta?.title ?? badgeId,
-                style: tBebas(15, c: ok ? kYellow : kMuted, ls: 1),
+                style: tBebas(15, c: ok ? kYellow : isNext ? kPaper.withValues(alpha: 0.6) : kMuted, ls: 1),
               ),
               const SizedBox(height: 3),
               Text(
@@ -194,7 +208,9 @@ class _BadgeRow extends StatelessWidget {
           padding: const EdgeInsets.only(right: 12),
           child: ok
               ? const Icon(Icons.emoji_events, color: kYellow, size: 22)
-              : const Icon(Icons.lock_outline, color: kMuted, size: 20),
+              : isNext
+                  ? Icon(Icons.radio_button_unchecked, color: kYellow.withValues(alpha: 0.5), size: 20)
+                  : const Icon(Icons.radio_button_unchecked, color: kMuted, size: 20),
         ),
       ]),
     );

@@ -24,58 +24,58 @@ ReadingBadgeMeta? readingBadgeMeta(String badgeId) {
   switch (badgeId) {
     case ReadingBadgeIds.pioneerWeek:
       return const ReadingBadgeMeta(
-        'Pionnier de la semaine',
-        'Premier tome terminé de cette semaine (lundi–dimanche).',
+        ‘Starter de la semaine’,
+        ‘Premier tome terminé cette semaine — belle mise en route !’,
       );
     case ReadingBadgeIds.pioneerMonth:
       return const ReadingBadgeMeta(
-        'Pionnier du mois',
-        'Premier tome terminé de ce mois civil.',
+        ‘Lanceur du mois’,
+        ‘Premier tome terminé ce mois — tu donnes le ton !’,
       );
     case ReadingBadgeIds.pioneerYear:
       return const ReadingBadgeMeta(
-        'Pionnier de l’année',
-        'Premier tome terminé de cette année civile.',
+        ‘Démarreur de l’année’,
+        ‘Premier tome terminé cette année — quelle année ça va être !’,
       );
     case ReadingBadgeIds.firstBookEver:
       return const ReadingBadgeMeta(
-        'Première clôture',
-        'Ton tout premier tome marqué comme terminé.',
+        ‘Première page tournée’,
+        ‘Ton tout premier tome bouclé. Le voyage commence ici !’,
       );
     case ReadingBadgeIds.books10:
       return const ReadingBadgeMeta(
-        'Dix tomes',
-        'Au moins dix œuvres terminées.',
+        ‘Lecteur assidu’,
+        ‘10 BD dévorées — le rythme est là, continue !’,
       );
     case ReadingBadgeIds.books25:
       return const ReadingBadgeMeta(
-        'Vingt-cinq tomes',
-        'Au moins vingt-cinq œuvres terminées.',
+        ‘Herbivore de cases’,
+        ‘25 albums au compteur. Tu es bien lancé(e) !’,
       );
     case ReadingBadgeIds.books50:
       return const ReadingBadgeMeta(
-        'Cinquante tomes',
-        'Au moins cinquante œuvres terminées.',
+        ‘Cinquante bulles’,
+        ‘50 tomes lus. Tu lis à un rythme impressionnant !’,
       );
     case ReadingBadgeIds.books100:
       return const ReadingBadgeMeta(
-        'Cent tomes',
-        'Au moins cent œuvres terminées.',
+        ‘Centurion des bulles’,
+        ‘100 œuvres ! Tu es une légende de la lecture BD.’,
       );
     case ReadingBadgeIds.firstSeriesComplete:
       return const ReadingBadgeMeta(
-        'Série bouclée',
-        'Première série complète (tous les tomes 1…N possédés et lus, N = nombre annoncé).',
+        ‘Série bouclée !’,
+        ‘Ta première série complète de A à Z. Aucune fin ne t’échappe !’,
       );
     case ReadingBadgeIds.seriesCollector5:
       return const ReadingBadgeMeta(
-        'Collectionneur de séries',
-        'Cinq séries complètes au sens « nombre de tomes attendu ».',
+        ‘Chasseur de fins’,
+        ‘5 séries terminées — tu ne laisses rien en suspens !’,
       );
     case ReadingBadgeIds.seriesCollector10:
       return const ReadingBadgeMeta(
-        'Maître des arcs',
-        'Dix séries complètes au sens « nombre de tomes attendu ».',
+        ‘Maître des arcs’,
+        ‘10 séries complètes. Aucune histoire ne te résiste !’,
       );
     default:
       return null;
