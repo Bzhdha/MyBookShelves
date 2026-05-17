@@ -17,6 +17,7 @@ import '../reading/ui/reading_stats_page.dart';
 import '../reading/ui/reading_badges_page.dart';
 import 'book_carousel.dart';
 import 'series_alerts_section.dart';
+import 'series_completion_suggestions.dart';
 import 'series_page.dart';
 import 'marketplace_search.dart';
 import '../../core/speech_dictation.dart';
@@ -41,7 +42,7 @@ class _ShelfGroup{final Shelf parent;final List<Book> directBooks;final List<(Sh
 class NewHomePage extends StatefulWidget{const NewHomePage({super.key});@override State<NewHomePage> createState()=>_NHPState();}
 class _NHPState extends State<NewHomePage> with WidgetsBindingObserver{
 final _sc=TextEditingController();String _sq='';final _sp=SpeechDictation();bool _sl=false;
-Book? _lastRead;List<(Book,ReadingProgressRow)> _inProg=[];List<(SeriesData,List<int>)> _missing=[];
+Book? _lastRead;List<(Book,ReadingProgressRow)> _inProg=[];List<(SeriesData,List<int>)> _missing=[];List<({SeriesData series,int owned,List<int> missing})> _suggestions=[];
 List<_ShelfGroup> _shelfGroups=[];List<Book> _allBooks=[];List<Book> _unclassified=[];
 Timer? _debounce;
 
@@ -58,7 +59,7 @@ final rr=context.read<ReadingRepository>();final db=context.read<AppDb>();
 await ReadingBadgeEvaluator(db).syncMilestoneBadgesFromProgress();
 if(!mounted)return;
 final ss=context.read<ShelfService>();
-final lr=await rr.lastFinishedBook();final ip=await rr.booksInProgress();final ms=await rr.seriesWithMissingVolumes();
+final lr=await rr.lastFinishedBook();final ip=await rr.booksInProgress();final ms=await rr.seriesWithMissingVolumes();final sg=await rr.seriesCompletionSuggestions();
 final roots=await ss.getRootShelves();
 final groups=<_ShelfGroup>[];
 for(final root in roots){
@@ -67,7 +68,7 @@ final childData=<(Shelf,List<Book>)>[];
 for(final child in children){childData.add((child,await ss.getBooksByShelf(child.id)));}
 groups.add(_ShelfGroup(parent:root,directBooks:direct,children:childData));}
 final ab=await db.getAllBooks();final uc=await db.getUnclassifiedBooks();
-if(mounted)setState((){_lastRead=lr;_inProg=ip;_missing=ms;_shelfGroups=groups;_allBooks=ab;_unclassified=uc;});}
+if(mounted)setState((){_lastRead=lr;_inProg=ip;_missing=ms;_suggestions=sg;_shelfGroups=groups;_allBooks=ab;_unclassified=uc;});}
 
 Future<void> _voice()async{
 if(_sl){await _sp.stop();if(mounted)setState((){_sl=false;});return;}
@@ -147,6 +148,7 @@ child:Text('${_unclassified.length} ●',style:tBebas(12,c:kPaper,ls:1))),
 Padding(padding:const EdgeInsets.symmetric(horizontal:16),child:_ClassifyGrid(books:_unclassified,onTap:(b)=>_goBook(c,b))),
 ],
 ..._shelfGroups.expand((g)=>_shelfWidgets(c,g)),
+SeriesCompletionSuggestions(data:_suggestions),
 SeriesAlertsSection(data:_missing),
 MarketplaceSearch(books:_allBooks),
 const SizedBox(height:20),
