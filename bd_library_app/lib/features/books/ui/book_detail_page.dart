@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../db/app_db.dart';
 import '../data/cover_cache_service.dart';
@@ -219,6 +220,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
               );
             }),
           ],
+          ..._buildNextMissingHint(context),
           if (book!.summary.trim().isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(
@@ -644,6 +646,45 @@ class _BookDetailPageState extends State<BookDetailPage> {
     if (!context.mounted) return;
     await _load();
   }
+
+  List<Widget> _buildNextMissingHint(BuildContext context) {
+    final b=book;
+    if(b==null||b.seriesId==null||_seriesName==null)return[];
+    final cur=b.volumeNumber;
+    if(cur==null)return[];
+    final ownedNums={cur,..._seriesSiblings.map((s)=>s.volumeNumber).whereType<int>()};
+    final nextVol=cur+1;
+    if(ownedNums.contains(nextVol))return[];
+    final name=_seriesName!;
+    final q='$name tome $nextVol';
+    return[
+      const SizedBox(height:12),
+      Container(
+        padding:const EdgeInsets.all(12),
+        decoration:BoxDecoration(color:Colors.amber.shade50,border:Border.all(color:Colors.amber.shade300,width:1.5),borderRadius:BorderRadius.circular(4)),
+        child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Row(children:[
+            Icon(Icons.auto_fix_high,color:Colors.amber.shade800,size:14),
+            const SizedBox(width:6),
+            Text('Tome suivant manquant',style:TextStyle(fontSize:11,fontWeight:FontWeight.w600,color:Colors.amber.shade800,letterSpacing:0.5)),
+          ]),
+          const SizedBox(height:8),
+          Row(children:[
+            Container(padding:const EdgeInsets.symmetric(horizontal:10,vertical:4),decoration:BoxDecoration(color:Colors.amber.shade800,borderRadius:BorderRadius.circular(4)),child:Text('Tome $nextVol',style:const TextStyle(fontSize:14,fontWeight:FontWeight.bold,color:Colors.white))),
+            const SizedBox(width:12),
+            _mkBtn('Leboncoin',Colors.amber,()async{await launchUrl(Uri.parse('https://www.leboncoin.fr/recherche?text=${Uri.encodeComponent(q)}&category=27'),mode:LaunchMode.externalApplication);}),
+            const SizedBox(width:6),
+            _mkBtn('Vinted',const Color(0xFF00A86B),()async{await launchUrl(Uri.parse('https://www.vinted.fr/catalog?search_text=${Uri.encodeComponent(q)}'),mode:LaunchMode.externalApplication);}),
+          ]),
+        ]),
+      ),
+    ];
+  }
+
+  Widget _mkBtn(String label,Color color,VoidCallback onTap)=>InkWell(onTap:onTap,child:Container(
+    padding:const EdgeInsets.symmetric(horizontal:10,vertical:6),
+    decoration:BoxDecoration(color:color,borderRadius:BorderRadius.circular(4)),
+    child:Text(label,style:const TextStyle(fontSize:12,fontWeight:FontWeight.w600,color:Colors.black))));
 
   Widget _buildShelvesSection(BuildContext context) {
     return Column(
