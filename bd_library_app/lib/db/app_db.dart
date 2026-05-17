@@ -734,6 +734,27 @@ class AppDb extends _$AppDb {
     }
     return out;
   }
+
+  /// Séries incomplètes avec au moins 1 tome possédé, triées par taux de complétion décroissant.
+  Future<List<({SeriesData series,int owned,List<int> missing})>> getSeriesCompletionSuggestions()async{
+    final all=await getAllSeries();
+    final result=<({SeriesData series,int owned,List<int> missing})>[];
+    for(final s in all){
+      final exp=s.expectedVolumes;if(exp==null||exp<=0)continue;
+      final bks=await getBooksBySeries(s.id);
+      final ownedNums=bks.map((b)=>b.volumeNumber).whereType<int>().toSet();
+      if(ownedNums.isEmpty)continue;
+      final missing=<int>[];for(int i=1;i<=exp;i++){if(!ownedNums.contains(i))missing.add(i);}
+      if(missing.isEmpty)continue;
+      result.add((series:s,owned:ownedNums.length,missing:missing));
+    }
+    result.sort((a,b){
+      final pA=a.owned/a.series.expectedVolumes!;
+      final pB=b.owned/b.series.expectedVolumes!;
+      return pB.compareTo(pA);
+    });
+    return result;
+  }
 }
 
 /// Constantes statut de lecture (alignées sur [ReadingProgress.status]).

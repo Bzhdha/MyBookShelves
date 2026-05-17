@@ -150,6 +150,7 @@ class ReadingRepository {
   }
 
   Future<List<(SeriesData,List<int>)>> seriesWithMissingVolumes()=>_db.getSeriesWithMissingVolumes();
+  Future<List<({SeriesData series,int owned,List<int> missing})>> seriesCompletionSuggestions()=>_db.getSeriesCompletionSuggestions();
 
   /// Livres pour un statut, groupés par étagère (thème → sous-thème → alpha).
   Future<List<({Shelf? parent,Shelf shelf,List<(Book,ReadingProgressRow)>books})>>

@@ -4,10 +4,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_theme.dart';
 import '../../db/app_db.dart';
 import '../books/ui/book_detail_page.dart';
+import 'series_completion_suggestions.dart';
 
 class SeriesPage extends StatefulWidget{const SeriesPage({super.key});@override State<SeriesPage> createState()=>_SPState();}
 class _SPState extends State<SeriesPage>{
 List<SeriesData> _series=[];Map<String,List<Book>> _books={};String _q='';
+List<({SeriesData series,int owned,List<int> missing})> _suggestions=[];
 final _sc=TextEditingController();
 
 @override void initState(){super.initState();_sc.addListener((){if(mounted)setState((){_q=_sc.text.trim();});});_load();}
@@ -18,7 +20,8 @@ Future<void> _load()async{
   final all=await db.getAllSeries();
   final m=<String,List<Book>>{};
   for(final s in all){final books=await db.getBooksBySeries(s.id);books.sort((a,b)=>(a.volumeNumber??9999).compareTo(b.volumeNumber??9999));m[s.id]=books;}
-  if(mounted)setState((){_series=all;_books=m;});}
+  final sg=await db.getSeriesCompletionSuggestions();
+  if(mounted)setState((){_series=all;_books=m;_suggestions=sg;});}
 
 @override Widget build(BuildContext c)=>Scaffold(
   backgroundColor:kInk,
@@ -41,12 +44,20 @@ Widget _searchBar()=>Container(
 
 Widget _list(){
   final f=_q.isEmpty?_series:_series.where((s)=>s.name.toLowerCase().contains(_q.toLowerCase())).toList();
-  if(f.isEmpty)return ListView(physics:const AlwaysScrollableScrollPhysics(),children:[Padding(padding:const EdgeInsets.only(top:80),child:Center(child:Text(_q.isEmpty?'Aucune série':'Aucun résultat',style:tBebas(18,c:kMuted))))]);
-  return ListView.separated(
+  final showSug=_q.isEmpty&&_suggestions.isNotEmpty;
+  if(f.isEmpty&&!showSug)return ListView(physics:const AlwaysScrollableScrollPhysics(),children:[Padding(padding:const EdgeInsets.only(top:80),child:Center(child:Text(_q.isEmpty?'Aucune série':'Aucun résultat',style:tBebas(18,c:kMuted))))]);
+  return ListView.builder(
     physics:const AlwaysScrollableScrollPhysics(),
-    itemCount:f.length,
-    separatorBuilder:(_,__)=>const Divider(color:kBorder,height:1),
-    itemBuilder:(c,i)=>_tile(c,f[i]));}
+    itemCount:(showSug?1:0)+(f.isEmpty?0:f.length*2-1),
+    itemBuilder:(c,i){
+      if(showSug){
+        if(i==0)return SeriesCompletionSuggestions(data:_suggestions);
+        i--;
+      }
+      final idx=i~/2;
+      if(i.isOdd)return const Divider(color:kBorder,height:1);
+      return _tile(c,f[idx]);
+    });}
 
 Widget _tile(BuildContext c,SeriesData s){
   final books=_books[s.id]??[];
