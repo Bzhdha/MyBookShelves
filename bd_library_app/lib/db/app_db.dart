@@ -641,6 +641,11 @@ class AppDb extends _$AppDb {
     return total;
   }
 
+  Future<int> readingSecondsBetween(DateTime from, DateTime to) async {
+    final s = await (select(readingSessions)..where((t) => t.endedAt.isNotNull()&t.endedAt.isBiggerOrEqualValue(from)&t.endedAt.isSmallerOrEqualValue(to))).get();
+    var total=0;for(final r in s)total+=r.durationSeconds??0;return total;
+  }
+
   Future<ReadingGoalsRow?> readingGoalsRow() =>
       (select(readingGoals)..where((t) => t.id.equals('default')))
           .getSingleOrNull();

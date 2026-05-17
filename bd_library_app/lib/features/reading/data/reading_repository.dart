@@ -47,6 +47,21 @@ class ReadingRepository {
 
   Future<int> totalReadingSeconds() => _db.totalCompletedReadingSeconds();
 
+  Future<int> readingSecondsThisWeek() {
+    final n=DateTime.now();final s=DateTime(n.year,n.month,n.day-(n.weekday-1));
+    return _db.readingSecondsBetween(s,DateTime(s.year,s.month,s.day+6,23,59,59));
+  }
+
+  Future<int> readingSecondsThisMonth() {
+    final n=DateTime.now();
+    return _db.readingSecondsBetween(DateTime(n.year,n.month),DateTime(n.year,n.month+1,0,23,59,59));
+  }
+
+  Future<int> readingSecondsThisYear() {
+    final n=DateTime.now();
+    return _db.readingSecondsBetween(DateTime(n.year),DateTime(n.year,12,31,23,59,59));
+  }
+
   Future<ReadingGoalsRow> goals() => _db.getOrCreateReadingGoals();
 
   Future<void> upsertGoals(ReadingGoalsCompanion g) =>
