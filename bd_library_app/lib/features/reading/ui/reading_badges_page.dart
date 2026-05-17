@@ -7,6 +7,7 @@ import '../../../core/app_theme.dart';
 import '../../../db/app_db.dart';
 import '../data/badges_prefs.dart';
 import '../domain/reading_badge_catalog.dart';
+import '../domain/reading_badge_evaluator.dart';
 
 const _cats = [
   ('📖 Jalons de lecture', [
@@ -62,11 +63,16 @@ class ReadingBadgesPage extends StatefulWidget {
 class _ReadingBadgesPageState extends State<ReadingBadgesPage> {
   static final _fmt = DateFormat.yMMMd('fr_FR');
   late final Stream<List<EarnedBadgeRow>> _stream;
+  bool _syncing = true;
 
   @override
   void initState() {
     super.initState();
-    _stream = context.read<AppDb>().watchEarnedBadges();
+    final db = context.read<AppDb>();
+    _stream = db.watchEarnedBadges();
+    ReadingBadgeEvaluator(db).syncMilestoneBadgesFromProgress().whenComplete(() {
+      if (mounted) setState(() => _syncing = false);
+    });
   }
 
   @override
@@ -77,6 +83,11 @@ class _ReadingBadgesPageState extends State<ReadingBadgesPage> {
     appBar: AppBar(
       title: const Text('Badges de lecture'),
       actions: [
+        if (_syncing)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: kInk)),
+          ),
         PopupMenuButton<Color>(
           icon: const Icon(Icons.palette_outlined),
           tooltip: 'Couleur de fond',

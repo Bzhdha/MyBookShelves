@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
+import 'package:bd_library_app/core/app_theme.dart';
 import 'package:bd_library_app/db/app_db.dart';
 import 'package:bd_library_app/features/reading/data/badges_prefs.dart';
 import 'package:bd_library_app/features/reading/domain/reading_badge_catalog.dart';
@@ -23,6 +24,7 @@ void main() {
   tearDown(() => db.close());
 
   Widget wrap() => MaterialApp(
+    theme: buildBdTheme(),
     home: MultiProvider(
       providers: [
         Provider<AppDb>.value(value: db),
