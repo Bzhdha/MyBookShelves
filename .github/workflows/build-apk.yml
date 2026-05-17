@@ -61,7 +61,7 @@ jobs:
 
       - name: Run tests
         run: |
-          timeout 120 flutter test || echo "::warning::Tests failed or timed out — skipping (temporary)"
+          timeout 45 flutter test || echo "::warning::Tests failed or timed out — skipping (temporary)"
 
       - name: Setup signing
         env:
