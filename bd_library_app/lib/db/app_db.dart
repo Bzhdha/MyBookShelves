@@ -760,6 +760,26 @@ class AppDb extends _$AppDb {
     });
     return result;
   }
+
+  /// Détecte automatiquement les lacunes entre le premier et le dernier tome
+  /// possédé, sans nécessiter que [expectedVolumes] soit renseigné.
+  Future<List<({SeriesData series,List<int> gaps})>> getAutoDetectedSeriesGaps()async{
+    final all=await getAllSeries();
+    final result=<({SeriesData series,List<int> gaps})>[];
+    for(final s in all){
+      final books=await getBooksBySeries(s.id);
+      final owned=books.map((b)=>b.volumeNumber).whereType<int>().toSet();
+      if(owned.length<2)continue;
+      final minV=owned.reduce((a,b)=>a<b?a:b);
+      final maxV=owned.reduce((a,b)=>a>b?a:b);
+      final gaps=<int>[];
+      for(int i=minV+1;i<maxV;i++){if(!owned.contains(i))gaps.add(i);}
+      if(gaps.isEmpty)continue;
+      result.add((series:s,gaps:gaps));
+    }
+    result.sort((a,b)=>a.gaps.length.compareTo(b.gaps.length));
+    return result;
+  }
 }
 
 /// Constantes statut de lecture (alignées sur [ReadingProgress.status]).
