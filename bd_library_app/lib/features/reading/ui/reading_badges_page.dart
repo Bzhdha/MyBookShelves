@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/app_logger.dart';
 import '../../../core/app_theme.dart';
 import '../../../db/app_db.dart';
 import '../data/badges_prefs.dart';
@@ -64,14 +65,18 @@ class _ReadingBadgesPageState extends State<ReadingBadgesPage> {
   static final _fmt = DateFormat.yMMMd('fr_FR');
   late final Stream<List<EarnedBadgeRow>> _stream;
   bool _syncing = true;
+  int? _loggedEarnedCount;
 
   @override
   void initState() {
     super.initState();
     final db = context.read<AppDb>();
+    context.read<AppLogger>().log('ReadingBadgesPage.open');
     _stream = db.watchEarnedBadges();
     ReadingBadgeEvaluator(db).syncMilestoneBadgesFromProgress().whenComplete(() {
-      if (mounted) setState(() => _syncing = false);
+      if (!mounted) return;
+      setState(() => _syncing = false);
+      context.read<AppLogger>().log('ReadingBadgesPage.syncComplete');
     });
   }
 
@@ -108,7 +113,10 @@ class _ReadingBadgesPageState extends State<ReadingBadgesPage> {
               ]),
             );
           }).toList(),
-          onSelected: (c) => ctx.read<BadgesPrefs>().setBg(c),
+          onSelected: (c) {
+            ctx.read<AppLogger>().log('ReadingBadgesPage.bgColorChanged', {'color': '#${c.value.toRadixString(16)}'});
+            ctx.read<BadgesPrefs>().setBg(c);
+          },
         ),
       ],
     ),
@@ -118,6 +126,15 @@ class _ReadingBadgesPageState extends State<ReadingBadgesPage> {
       builder: (ctx, snap) {
         if (snap.hasError) return Center(child: Text('Erreur: ${snap.error}', style: const TextStyle(color: kRed)));
         final earned = {for (final r in snap.data ?? <EarnedBadgeRow>[]) r.badgeId: r};
+        if (_loggedEarnedCount != earned.length) {
+          _loggedEarnedCount = earned.length;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) ctx.read<AppLogger>().log('ReadingBadgesPage.badgesLoaded', {
+              'earnedCount': earned.length,
+              'earnedIds': earned.keys.join(', '),
+            });
+          });
+        }
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
           children: [

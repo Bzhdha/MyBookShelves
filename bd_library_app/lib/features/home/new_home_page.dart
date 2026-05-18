@@ -37,6 +37,7 @@ import '../settings/data/app_lock_store.dart';
 import '../settings/ui/api_key_page.dart';
 import '../settings/ui/scan_settings_page.dart';
 import '../logs/ui/logs_page.dart';
+import '../../core/app_logger.dart';
 
 class _ShelfGroup{final Shelf parent;final List<Book> directBooks;final List<(Shelf,List<Book>)> children;_ShelfGroup({required this.parent,required this.directBooks,required this.children});}
 
@@ -201,7 +202,7 @@ _navItem(Icons.menu_book,'Biblio',true,(){}),
 _navItem(Icons.collections_bookmark,'Séries',false,()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>const SeriesPage()))),
 _navItem(Icons.book,'Lecture',false,()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingStatusPage()))),
 _navItem(Icons.bar_chart,'Stats',false,()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingStatsPage()))),
-_navItem(Icons.emoji_events,'Badges',false,()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingBadgesPage()))),
+_navItem(Icons.emoji_events,'Badges',false,(){c.read<AppLogger>().log('MenuBadge.bottomNavTap');Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingBadgesPage()));}),
 ])));}
 
 Widget _navItem(IconData icon,String label,bool active,VoidCallback onTap){
@@ -258,7 +259,7 @@ _dItem(Icons.linear_scale,'Progression',(){Navigator.pop(c);Navigator.push(c,Mat
 _dItem(Icons.flag_outlined,'Objectifs',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingGoalsPage()));}),
 _dItem(Icons.history,'Historique',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingHistoryPage()));}),
 _dItem(Icons.bar_chart_outlined,'Stats',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingStatsPage()));}),
-_dItem(Icons.emoji_events_outlined,'Badges',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingBadgesPage()));}),
+_dItem(Icons.emoji_events_outlined,'Badges',(){Navigator.pop(c);c.read<AppLogger>().log('MenuBadge.drawerTap');Navigator.push(c,MaterialPageRoute(builder:(_)=>const ReadingBadgesPage()));}),
 _dSec('Paramètres'),
 _dItem(Icons.key,'Clés API',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ApiKeyPage()));}),
 _dItem(Icons.settings,'Paramètres scan',(){Navigator.pop(c);Navigator.push(c,MaterialPageRoute(builder:(_)=>const ScanSettingsPage()));}),
