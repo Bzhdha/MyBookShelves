@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "(cd bd_library_app && out=$(flutter pub outdated 2>&1) && if ! echo \"$out\" | grep -q \"no outdated\"; then printf '{\"systemMessage\":\"Des mises à jour de dépendances Flutter sont disponibles. Lancez: cd bd_library_app && flutter pub outdated\"}'; fi) 2>/dev/null || true",
+            "timeout": 30,
+            "statusMessage": "Vérification des dépendances Flutter..."
+          }
+        ]
+      }
+    ]
+  }
+}
